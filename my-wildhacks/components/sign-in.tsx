@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    marginBottom: 8, // Reduced margin to minimize space below the password field
+    marginBottom:0, // Reduced margin to minimize space below the password field
     backgroundColor: '#fff',
   },
   passwordInput: {
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   eyeIcon: {
-    padding: 8, // Reduced padding to shrink the eye icon
+    paddingRight: 8, // Reduced padding to shrink the eye icon
   },
   button: {
     backgroundColor: '#0066ff',

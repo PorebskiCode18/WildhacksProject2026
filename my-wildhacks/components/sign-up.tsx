@@ -7,41 +7,34 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { useRouter } from 'expo-router'
 import { auth } from '../firebaseConfig'
+import { Ionicons } from '@expo/vector-icons'
 
-type Props = {
-  onSignUp?: (email: string, password: string) => Promise<void> | void
-}
-
-export default function SignUp({ onSignUp }: Props) {
+export default function SignUp() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const router = useRouter()
 
-  const isEmailValid = email.includes('@')
-  const isPasswordValid = password.length >= 6
-  const isFormValid = isEmailValid && isPasswordValid
-
   const handleSignUp = async () => {
     setError(null)
-    if (!isFormValid) {
-      setError('Please provide a valid email and a password of at least 6 characters.')
+
+    if (!email.includes('@') || password.length < 6) {
+      setError('Invalid email or password (min 6 chars)')
       return
     }
 
     setLoading(true)
     try {
-      const authInstance = auth
-      await createUserWithEmailAndPassword(authInstance, email, password)
+      await createUserWithEmailAndPassword(auth, email, password)
 
-      if (onSignUp) await Promise.resolve(onSignUp(email, password))
-
-      router.replace('../(tabs)/home')
+      // ✅ GO TO HOME
+      router.replace('/home')
 
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-up failed')
@@ -52,45 +45,43 @@ export default function SignUp({ onSignUp }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
+      <Text style={styles.title}>Sign Up</Text>
 
       <TextInput
+        placeholder="Email"
         value={email}
         onChangeText={setEmail}
-        placeholder="Email"
-        keyboardType="email-address"
+        style={styles.input}
         autoCapitalize="none"
-        style={styles.input}
       />
 
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Password"
-        secureTextEntry
-        style={styles.input}
-      />
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      <Pressable
-        style={styles.button}
-        onPress={handleSignUp}
-        disabled={loading || !isFormValid}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Sign Up</Text>
-        )}
-      </Pressable>
-
-      <View style={styles.footerRow}>
-        <Text>Already have an account? </Text>
-        <Pressable onPress={() => router.push('/sign-in')}>
-          <Text style={styles.linkText}>Sign in</Text>
+      <View style={styles.passwordContainer}>
+        <TextInput
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          style={[styles.input, styles.passwordInput]}
+        />
+        <Pressable onPress={() => setShowPassword(!showPassword)}>
+          <Ionicons
+            name={showPassword ? 'eye-off' : 'eye'}
+            size={24}
+            color="#888"
+            style={styles.eyeIcon}
+          />
         </Pressable>
       </View>
+
+      {error && <Text style={styles.error}>{error}</Text>}
+
+      <Pressable style={styles.button} onPress={handleSignUp}>
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
+      </Pressable>
+
+      <Pressable onPress={() => router.push('/sign-in')}>
+        <Text style={styles.link}>Already have an account? Sign in</Text>
+      </Pressable>
     </View>
   )
 }
@@ -98,50 +89,60 @@ export default function SignUp({ onSignUp }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
     justifyContent: 'center',
-    backgroundColor: '#fff', // Ensure consistent background
+    padding: 24,
+    backgroundColor: '#fff',
   },
   title: {
     fontSize: 28,
     fontWeight: '600',
-    marginBottom: 24,
-    textAlign: 'center', // Ensure consistent title alignment
+    marginBottom: 20,
+    textAlign: 'center',
   },
   input: {
-    height: 48,
-    borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderColor: '#ddd',
+    padding: 12,
     marginBottom: 12,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    borderWidth: 0,
+  },
+  eyeIcon: {
+    paddingRight: 8, // Reduced padding to shrink the eye icon
   },
   button: {
-    height: 48,
     backgroundColor: '#0066ff',
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.9,
   },
   buttonText: {
     color: '#fff',
     fontWeight: '600',
   },
-  errorText: {
-    color: '#cc0000',
-    marginTop: 8,
+  error: {
+    color: 'red',
+    marginBottom: 10,
     textAlign: 'center',
   },
-  validationText: {
-    color: '#cc0000',
-    marginTop: 6,
-    fontSize: 13,
+  link: {
+    marginTop: 15,
+    textAlign: 'center',
+    color: '#0066ff',
+    fontWeight: '600',
   },
-  footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
-  footerText: { color: '#444' },
-  linkText: { color: '#0066ff', fontWeight: '600' },
 })
