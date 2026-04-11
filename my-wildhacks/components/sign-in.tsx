@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,97 +6,75 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-} from 'react-native'
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
-import { useRouter } from 'expo-router'
-import { auth } from '../firebaseConfig' // Import the exported auth instance
+} from 'react-native';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useRouter } from 'expo-router';
+import { auth } from '../firebaseConfig';
 
-type Props = {
-  onSignIn?: (email: string, password: string) => Promise<void> | void
-}
+export default function SignIn() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-export default function SignIn({ onSignIn }: Props) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const isEmailValid = email.includes('@')
-  const isPasswordValid = password.length >= 6
-  const isFormValid = isEmailValid && isPasswordValid
+  const router = useRouter();
 
   const handleSignIn = async () => {
-    setError(null)
-    if (!isFormValid) {
-      setError('Please provide a valid email and a password of at least 6 characters.')
-      return
+    setError(null);
+
+    if (!email.includes('@') || password.length < 6) {
+      setError('Invalid email or password (min 6 chars)');
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password)
-      if (onSignIn) await Promise.resolve(onSignIn(email, password))
-      router.replace('/(tabs)/home')
+      await signInWithEmailAndPassword(auth, email, password);
+
+      // ✅ GO TO HOME
+      router.replace('/home');
     } catch (err) {
-      setError((err as any)?.message ?? 'Sign-in failed')
+      setError((err as any)?.message ?? 'Sign-in failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Sign In</Text>
 
       <TextInput
+        placeholder="Email"
         value={email}
         onChangeText={setEmail}
-        placeholder="Email"
-        keyboardType="email-address"
-        autoCapitalize="none"
         style={styles.input}
-        accessible
-        accessibilityLabel="email"
+        autoCapitalize="none"
       />
-      {email && !isEmailValid ? (
-        <Text style={styles.validationText}>Enter a valid email address.</Text>
-      ) : null}
 
       <TextInput
+        placeholder="Password"
         value={password}
         onChangeText={setPassword}
-        placeholder="Password"
         secureTextEntry
         style={styles.input}
-        accessible
-        accessibilityLabel="password"
       />
-      {password && !isPasswordValid ? (
-        <Text style={styles.validationText}>Password must be at least 6 characters.</Text>
-      ) : null}
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-        onPress={handleSignIn}
-        disabled={loading || !isFormValid}
-        accessibilityRole="button"
-      >
+      <Pressable style={styles.button} onPress={handleSignIn}>
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.buttonText}>Sign In</Text>
         )}
       </Pressable>
-      <View style={styles.footerRow}>
-        <Text style={styles.footerText}>Don't have an account? </Text>
-        <Pressable onPress={() => router.push('/sign-up')}>
-          <Text style={styles.linkText}>Sign up</Text>
-        </Pressable>
-      </View>
+
+      <Pressable onPress={() => router.push('/sign-up')}>
+        <Text style={styles.link}>Don't have an account? Sign up</Text>
+      </Pressable>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -131,20 +109,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  errorText: {
-    color: '#cc0000',
-    marginTop: 8,
+  error: {
+    color: 'red',
+    marginBottom: 10,
     textAlign: 'center',
   },
-  validationText: {
-    color: '#cc0000',
-    marginTop: 6,
-    fontSize: 13,
+  link: {
+    marginTop: 15,
+    textAlign: 'center',
+    color: '#0066ff',
+    fontWeight: '600',
   },
-  footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
-  footerText: { color: '#444' },
-  linkText: { color: '#0066ff', fontWeight: '600' },
-  buttonPressed: {
-    opacity: 0.9, // Added to fix the missing style error
-  },
-})
+});

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator, Modal, TextInput, Pressable, Platform } from 'react-native'
-import { Agenda } from 'react-native-calendars'
+// import { Agenda } from 'react-native-calendars'
 import { getAuth } from 'firebase/auth'
 import CalendarAPI, { GoogleCalendarEvent } from '../lib/googleCalendar'
 
@@ -103,7 +103,7 @@ export default function Home() {
     <View style={styles.container}>
       <Text style={styles.title}>My Calendar</Text>
 
-      {loading && !refreshing ? (
+      {/* {loading && !refreshing ? (
         <ActivityIndicator style={{ marginTop: 24 }} />
       ) : (
         <Agenda
@@ -122,7 +122,7 @@ export default function Home() {
             <View style={styles.empty}><Text>{error ?? 'No upcoming events'}</Text></View>
           )}
         />
-      )}
+      )} */}
 
       <Pressable style={styles.fab} onPress={() => setModalVisible(true)} accessibilityRole="button">
         <Text style={styles.fabText}>+</Text>
