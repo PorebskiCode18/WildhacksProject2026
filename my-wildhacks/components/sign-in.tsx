@@ -6,13 +6,22 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'expo-router';
 import { auth } from '../firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 export default function SignIn() {
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,9 +30,19 @@ export default function SignIn() {
 
   const router = useRouter();
 
+  // Dynamic Theme Colors (Matches your Sign Up page)
+  const theme = {
+    gradient: isDarkMode ? ['#1a1a1a', '#333333'] : ['#FFFDD0', '#ffffff'],
+    text: isDarkMode ? '#ffffff' : '#000000',
+    inputBg: isDarkMode ? '#222' : '#fff',
+    inputBorder: isDarkMode ? '#444' : '#ddd',
+    placeholder: isDarkMode ? '#888' : '#999',
+    link: isDarkMode ? '#aaa' : '#666',
+    status: isDarkMode ? 'light' : 'dark'
+  };
+
   const handleSignIn = async () => {
     setError(null);
-
     if (!email.includes('@') || password.length < 6) {
       setError('Invalid email or password (min 6 chars)');
       return;
@@ -32,7 +51,6 @@ export default function SignIn() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // ✅ GO TO HOME
       router.replace('/home');
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-in failed');
@@ -42,125 +60,160 @@ export default function SignIn() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign In</Text>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <View style={styles.container}>
+        <StatusBar style={theme.status as any} />
+        <LinearGradient colors={theme.gradient as any} style={StyleSheet.absoluteFill} />
 
-      {/* Email Input */}
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={[styles.input, styles.emailInput]}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+        <SafeAreaView style={{ flex: 1 }}>
+          {/* Theme Toggle Icon */}
+          <View style={styles.headerAction}>
+            <Pressable 
+              onPress={() => setIsDarkMode(!isDarkMode)}
+              style={[styles.iconCircle, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+            >
+              <Ionicons 
+                name={isDarkMode ? 'sunny' : 'moon'} 
+                size={24} 
+                color={theme.text} 
+              />
+            </Pressable>
+          </View>
 
-      {/* Password Input Container */}
-      <View style={styles.passwordContainer}>
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          style={styles.passwordInput}
-        />
-        <Pressable onPress={() => setShowPassword(!showPassword)}>
-          <Ionicons
-            name={showPassword ? 'eye-off' : 'eye'}
-            size={22}
-            color="#888"
-            style={styles.eyeIcon}
-          />
-        </Pressable>
+          <View style={styles.content}>
+            <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>
+
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor={theme.placeholder}
+              value={email}
+              onChangeText={setEmail}
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <View style={[styles.passwordContainer, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <TextInput
+                placeholder="Password"
+                placeholderTextColor={theme.placeholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                style={[styles.passwordInput, { color: theme.text }]}
+              />
+              <Pressable onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={22}
+                  color={theme.placeholder}
+                  style={styles.eyeIcon}
+                />
+              </Pressable>
+            </View>
+
+            {error && <Text style={styles.error}>{error}</Text>}
+
+            <Pressable 
+              style={({ pressed }) => [
+                styles.button,
+                pressed && { opacity: 0.8 }
+              ]} 
+              onPress={handleSignIn}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
+            </Pressable>
+
+            <Pressable onPress={() => router.push('/sign-up')}>
+              <Text style={[styles.link, { color: theme.link }]}>Don't have an account? Sign up</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
       </View>
-
-      {error && <Text style={styles.error}>{error}</Text>}
-
-      <Pressable 
-        style={({ pressed }) => [
-          styles.button,
-          pressed && { opacity: 0.8 }
-        ]} 
-        onPress={handleSignIn}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
-        )}
-      </Pressable>
-
-      <Pressable onPress={() => router.push('/sign-up')}>
-        <Text style={styles.link}>Don't have an account? Sign up</Text>
-      </Pressable>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerAction: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingTop: 30, // Lowered icon as requested previously
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '600',
-    marginBottom: 20,
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 30,
     textAlign: 'center',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  emailInput: {
-    marginBottom: 12, 
+    padding: 15,
+    borderRadius: 12,
+    fontSize: 16,
+    marginBottom: 12,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 12,
-    backgroundColor: '#fff',
-    overflow: 'hidden', // Ensures the input doesn't overlap the border radius
+    overflow: 'hidden',
   },
   passwordInput: {
     flex: 1,
-    padding: 12,
-    fontSize: 14,
-    // Removed border here to stop the "double border" effect
+    padding: 15,
+    fontSize: 16,
   },
   eyeIcon: {
     paddingHorizontal: 12, 
   },
   button: {
     backgroundColor: '#0066ff',
-    padding: 14,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
   },
   buttonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16,
   },
   error: {
-    color: 'red',
+    color: '#ff4444',
     marginBottom: 10,
     textAlign: 'center',
   },
   link: {
-    marginTop: 15,
+    marginTop: 20,
     textAlign: 'center',
-    color: '#0066ff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
