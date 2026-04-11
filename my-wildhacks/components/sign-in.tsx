@@ -10,10 +10,12 @@ import {
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'expo-router';
 import { auth } from '../firebaseConfig';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -52,13 +54,23 @@ export default function SignIn() {
         autoCapitalize="none"
       />
 
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={styles.input}
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          style={[styles.input, styles.passwordInput]}
+        />
+        <Pressable onPress={() => setShowPassword(!showPassword)}>
+          <Ionicons
+            name={showPassword ? 'eye-off' : 'eye'}
+            size={24}
+            color="#888"
+            style={styles.eyeIcon}
+          />
+        </Pressable>
+      </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
 
@@ -97,6 +109,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 8,
     backgroundColor: '#fff',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginBottom: 8, // Reduced margin to minimize space below the password field
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    borderWidth: 0,
+  },
+  eyeIcon: {
+    padding: 8, // Reduced padding to shrink the eye icon
   },
   button: {
     backgroundColor: '#0066ff',
