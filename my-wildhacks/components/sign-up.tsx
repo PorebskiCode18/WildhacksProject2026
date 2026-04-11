@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { useNavigation } from '@react-navigation/native'
+import { app } from '../firebaseConfig' // Import the exported Firebase app
 
 type Props = {
   onSignUp?: (email: string, password: string) => Promise<void> | void
@@ -34,10 +35,11 @@ export default function SignUp({ onSignUp }: Props) {
 
     setLoading(true)
     try {
-      const auth = getAuth()
+      const auth = getAuth(app)
       await createUserWithEmailAndPassword(auth, email, password)
       if (onSignUp) await Promise.resolve(onSignUp(email, password))
       navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
+      navigation.navigate('Home');
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-up failed')
     } finally {

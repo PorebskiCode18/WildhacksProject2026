@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
 import { useNavigation } from '@react-navigation/native'
+import { app } from '../firebaseConfig' // Import the exported Firebase app
 
 type Props = {
   onSignIn?: (email: string, password: string) => Promise<void> | void
@@ -33,7 +34,7 @@ export default function SignIn({ onSignIn }: Props) {
 
     setLoading(true)
     try {
-      const auth = getAuth()
+      const auth = getAuth(app)
       await signInWithEmailAndPassword(auth, email, password)
       if (onSignIn) await Promise.resolve(onSignIn(email, password))
       navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
