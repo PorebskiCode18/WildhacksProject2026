@@ -32,10 +32,8 @@ export default function SignUp() {
     setLoading(true)
     try {
       await createUserWithEmailAndPassword(auth, email, password)
-
       // ✅ GO TO HOME
       router.replace('/home')
-
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-up failed')
     } finally {
@@ -47,21 +45,24 @@ export default function SignUp() {
     <View style={styles.container}>
       <Text style={styles.title}>Sign Up</Text>
 
+      {/* Email Field */}
       <TextInput
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
-        style={styles.input}
+        style={[styles.input, styles.emailInput]}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
 
+      {/* Password Field */}
       <View style={styles.passwordContainer}>
         <TextInput
           placeholder="Password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
-          style={[styles.input, styles.passwordInput]}
+          style={styles.passwordInput}
         />
         <Pressable onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
@@ -75,8 +76,19 @@ export default function SignUp() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={styles.button} onPress={handleSignUp}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
+      <Pressable 
+        style={({ pressed }) => [
+          styles.button,
+          pressed && { opacity: 0.8 }
+        ]} 
+        onPress={handleSignUp}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Sign Up</Text>
+        )}
       </Pressable>
 
       <Pressable onPress={() => router.push('/sign-in')}>
@@ -103,9 +115,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 12,
-    marginBottom: 12,
     borderRadius: 8,
     backgroundColor: '#fff',
+    fontSize: 16,
+  },
+  emailInput: {
+    marginBottom: 12, // Standard spacing below email
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -114,14 +129,17 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     backgroundColor: '#fff',
-    marginBottom: 8, // Removed extra space below the password container
+    marginBottom: 12, // Same spacing as email field
+    overflow: 'hidden',
   },
   passwordInput: {
     flex: 1,
-    borderWidth: 0,
+    padding: 12, // Matches the email input padding exactly
+    fontSize: 16,
+    // No borders here to avoid the double-border or size bloat
   },
   eyeIcon: {
-    paddingRight: 8, // Reduced padding to shrink the eye icon
+    paddingHorizontal: 12,
   },
   button: {
     backgroundColor: '#0066ff',
@@ -133,6 +151,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 16,
   },
   error: {
     color: 'red',

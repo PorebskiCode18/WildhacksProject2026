@@ -32,7 +32,6 @@ export default function SignIn() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-
       // ✅ GO TO HOME
       router.replace('/home');
     } catch (err) {
@@ -46,21 +45,24 @@ export default function SignIn() {
     <View style={styles.container}>
       <Text style={styles.title}>Sign In</Text>
 
+      {/* Email Input */}
       <TextInput
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
-        style={styles.input}
+        style={[styles.input, styles.emailInput]}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
 
+      {/* Password Input Container */}
       <View style={styles.passwordContainer}>
         <TextInput
           placeholder="Password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
-          style={[styles.input, styles.passwordInput]}
+          style={styles.passwordInput}
         />
         <Pressable onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
@@ -74,7 +76,14 @@ export default function SignIn() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={styles.button} onPress={handleSignIn}>
+      <Pressable 
+        style={({ pressed }) => [
+          styles.button,
+          pressed && { opacity: 0.8 }
+        ]} 
+        onPress={handleSignIn}
+        disabled={loading}
+      >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
@@ -106,9 +115,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 12,
-    marginBottom: 12,
     borderRadius: 8,
     backgroundColor: '#fff',
+  },
+  emailInput: {
+    marginBottom: 12, 
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -116,15 +127,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    marginBottom:8, // Reduced margin to minimize space below the password field
+    marginBottom: 12,
     backgroundColor: '#fff',
+    overflow: 'hidden', // Ensures the input doesn't overlap the border radius
   },
   passwordInput: {
     flex: 1,
-    borderWidth: 0,
+    padding: 12,
+    fontSize: 14,
+    // Removed border here to stop the "double border" effect
   },
   eyeIcon: {
-    paddingRight: 8, // Reduced padding to shrink the eye icon
+    paddingHorizontal: 12, 
   },
   button: {
     backgroundColor: '#0066ff',
@@ -136,6 +150,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 16,
   },
   error: {
     color: 'red',
