@@ -7,24 +7,25 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native'
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { useNavigation } from '@react-navigation/native'
 
 type Props = {
-  onSignIn?: (email: string, password: string) => Promise<void> | void
+  onSignUp?: (email: string, password: string) => Promise<void> | void
 }
 
-export default function SignIn({ onSignIn }: Props) {
+export default function SignUp({ onSignUp }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const navigation = useNavigation<any>()
+
   const isEmailValid = email.includes('@')
   const isPasswordValid = password.length >= 6
   const isFormValid = isEmailValid && isPasswordValid
 
-  const handleSignIn = async () => {
+  const handleSignUp = async () => {
     setError(null)
     if (!isFormValid) {
       setError('Please provide a valid email and a password of at least 6 characters.')
@@ -34,11 +35,11 @@ export default function SignIn({ onSignIn }: Props) {
     setLoading(true)
     try {
       const auth = getAuth()
-      await signInWithEmailAndPassword(auth, email, password)
-      if (onSignIn) await Promise.resolve(onSignIn(email, password))
+      await createUserWithEmailAndPassword(auth, email, password)
+      if (onSignUp) await Promise.resolve(onSignUp(email, password))
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] })
     } catch (err: any) {
-      setError(err?.message ?? 'Sign-in failed')
+      setError(err?.message ?? 'Sign-up failed')
     } finally {
       setLoading(false)
     }
@@ -46,7 +47,7 @@ export default function SignIn({ onSignIn }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sign In</Text>
+      <Text style={styles.title}>Create Account</Text>
 
       <TextInput
         value={email}
@@ -79,20 +80,21 @@ export default function SignIn({ onSignIn }: Props) {
 
       <Pressable
         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-        onPress={handleSignIn}
+        onPress={handleSignUp}
         disabled={loading || !isFormValid}
         accessibilityRole="button"
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
+          <Text style={styles.buttonText}>Sign Up</Text>
         )}
       </Pressable>
+
       <View style={styles.footerRow}>
-        <Text style={styles.footerText}>Don't have an account? </Text>
-        <Pressable onPress={() => navigation.navigate('SignUp')}>
-          <Text style={styles.linkText}>Sign up</Text>
+        <Text style={styles.footerText}>Already have an account? </Text>
+        <Pressable onPress={() => navigation.navigate('SignIn')}>
+          <Text style={styles.linkText}>Sign in</Text>
         </Pressable>
       </View>
     </View>
@@ -128,23 +130,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
   },
-  buttonPressed: {
-    opacity: 0.9,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#cc0000',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  validationText: {
-    color: '#cc0000',
-    marginTop: 6,
-    fontSize: 13,
-  },
+  buttonPressed: { opacity: 0.9 },
+  buttonText: { color: '#fff', fontWeight: '600' },
+  errorText: { color: '#cc0000', marginTop: 8, textAlign: 'center' },
+  validationText: { color: '#cc0000', marginTop: 6, fontSize: 13 },
   footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   footerText: { color: '#444' },
   linkText: { color: '#0066ff', fontWeight: '600' },
