@@ -55,7 +55,7 @@ export default function Home() {
           <View style={styles.header}>
             <View>
               <Text style={styles.greeting}>Welcome back,</Text>
-              <Text style={styles.username}>{userName}</Text>
+              <Text style={styles.username}>{userData.firstName}</Text>
             </View>
             <Pressable style={styles.profileBadge}>
               <Ionicons name="person" size={20} color="#ff9d33" />
