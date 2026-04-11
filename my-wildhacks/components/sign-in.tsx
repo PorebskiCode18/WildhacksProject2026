@@ -36,7 +36,7 @@ export default function SignIn({ onSignIn }: Props) {
     try {
       await signInWithEmailAndPassword(auth, email, password)
       if (onSignIn) await Promise.resolve(onSignIn(email, password))
-      router.replace('/(tabs)/home')
+      router.replace('../(tabs)/home')
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-in failed')
     } finally {
