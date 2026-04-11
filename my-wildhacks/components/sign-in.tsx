@@ -9,6 +9,8 @@ import {
 } from 'react-native'
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
 import { useNavigation } from '@react-navigation/native'
+import { initializeApp } from 'firebase/app'
+import { firebaseConfig } from '../firebaseConfig'
 
 type Props = {
   onSignIn?: (email: string, password: string) => Promise<void> | void
@@ -36,7 +38,7 @@ export default function SignIn({ onSignIn }: Props) {
       const auth = getAuth()
       await signInWithEmailAndPassword(auth, email, password)
       if (onSignIn) await Promise.resolve(onSignIn(email, password))
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] })
+      navigation.reset({ index: 0, routes: [{ name: 'home' }] })
     } catch (err: any) {
       setError(err?.message ?? 'Sign-in failed')
     } finally {
@@ -149,3 +151,5 @@ const styles = StyleSheet.create({
   footerText: { color: '#444' },
   linkText: { color: '#0066ff', fontWeight: '600' },
 })
+
+initializeApp(firebaseConfig)
