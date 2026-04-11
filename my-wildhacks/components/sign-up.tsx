@@ -41,11 +41,7 @@ export default function SignUp({ onSignUp }: Props) {
       const auth = getAuth()
       await createUserWithEmailAndPassword(auth, email, password)
       if (onSignUp) await Promise.resolve(onSignUp(email, password))
-<<<<<<< HEAD
-      navigation.reset({ index: 0, routes: [{ name: 'home' }] })
-=======
       navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
->>>>>>> 4d191d752f1bd0d81028f2dbe902e024e7c04906
     } catch (err: any) {
       setError(err?.message ?? 'Sign-up failed')
     } finally {
