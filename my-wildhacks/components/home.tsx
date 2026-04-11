@@ -6,7 +6,7 @@ import CalendarAPI, { GoogleCalendarEvent } from '../lib/googleCalendar'
 
 export default function Home() {
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([])
-  const [items, setItems] = useState<Record<string, Array<{ name: string; event: GoogleCalendarEvent }>>>({})
+  const [items, setItems] = useState<Record<string, Array<{ name: string; event: GoogleCalendarEvent; height: number; day: string }>>>({})
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,12 +38,12 @@ export default function Home() {
       setEvents(itemsRes)
 
       // Build Agenda items keyed by date (YYYY-MM-DD)
-      const dayItems: Record<string, Array<{ name: string; event: GoogleCalendarEvent }>> = {}
+      const dayItems: Record<string, Array<{ name: string; event: GoogleCalendarEvent; height: number; day: string }>> = {}
       for (const ev of itemsRes) {
         const dt = ev.start?.dateTime ?? ev.start?.date
         let dateKey = dt ? String(dt).split('T')[0] : new Date().toISOString().split('T')[0]
         if (!dayItems[dateKey]) dayItems[dateKey] = []
-        dayItems[dateKey].push({ name: ev.summary ?? 'Untitled', event: ev })
+        dayItems[dateKey].push({ name: ev.summary ?? 'Untitled', event: ev, height: 80, day: dateKey })
       }
       const today = new Date().toISOString().split('T')[0]
       if (!dayItems[today]) dayItems[today] = dayItems[today] || []
@@ -112,7 +112,7 @@ export default function Home() {
           selected={new Date().toISOString().split('T')[0]}
           onRefresh={onRefresh}
           refreshing={refreshing}
-          renderItem={(item) => (
+          renderItem={(item: any) => (
             <View style={styles.eventRow}>
               <Text style={styles.eventTitle}>{item.name}</Text>
               <Text style={styles.eventTime}>{item.event.start?.dateTime ?? item.event.start?.date}</Text>

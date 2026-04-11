@@ -41,7 +41,7 @@ export default function SignUp({ onSignUp }: Props) {
 
       if (onSignUp) await Promise.resolve(onSignUp(email, password))
 
-      router.replace('/(tabs)/home')
+      router.replace('../(tabs)/home')
 
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-up failed')
