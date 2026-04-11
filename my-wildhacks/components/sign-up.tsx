@@ -66,7 +66,7 @@ export default function SignUp() {
         <Pressable onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
             name={showPassword ? 'eye-off' : 'eye'}
-            size={24}
+            size={22}
             color="#888"
             style={styles.eyeIcon}
           />
@@ -113,8 +113,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    
     backgroundColor: '#fff',
+    marginBottom: 8, // Removed extra space below the password container
   },
   passwordInput: {
     flex: 1,
