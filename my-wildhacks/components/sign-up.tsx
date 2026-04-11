@@ -9,8 +9,6 @@ import {
 } from 'react-native'
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { useNavigation } from '@react-navigation/native'
-import { initializeApp } from 'firebase/app'
-import { firebaseConfig } from '../firebaseConfig'
 
 type Props = {
   onSignUp?: (email: string, password: string) => Promise<void> | void
@@ -22,8 +20,6 @@ export default function SignUp({ onSignUp }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const navigation = useNavigation<any>()
-
-  initializeApp(firebaseConfig)
 
   const isEmailValid = email.includes('@')
   const isPasswordValid = password.length >= 6
@@ -42,8 +38,8 @@ export default function SignUp({ onSignUp }: Props) {
       await createUserWithEmailAndPassword(auth, email, password)
       if (onSignUp) await Promise.resolve(onSignUp(email, password))
       navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
-    } catch (err: any) {
-      setError(err?.message ?? 'Sign-up failed')
+    } catch (err) {
+      setError((err as any)?.message ?? 'Sign-up failed')
     } finally {
       setLoading(false)
     }
@@ -97,7 +93,6 @@ export default function SignUp({ onSignUp }: Props) {
 
       <View style={styles.footerRow}>
         <Text style={styles.footerText}>Already have an account? </Text>
-        <Pressable onPress={() => navigation.navigate('SignIn')}>
         <Pressable onPress={() => navigation.navigate('sign-in')}>
           <Text style={styles.linkText}>Sign in</Text>
         </Pressable>
