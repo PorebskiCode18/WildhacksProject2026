@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
-import { useNavigation } from '@react-navigation/native'
-import { app } from '../firebaseConfig' // Import the exported Firebase app
+import { useRouter } from 'expo-router'
+import { auth } from '../firebaseConfig' // Import the exported auth instance
 
 type Props = {
   onSignIn?: (email: string, password: string) => Promise<void> | void
@@ -20,7 +20,7 @@ export default function SignIn({ onSignIn }: Props) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const navigation = useNavigation<any>()
+  const router = useRouter()
   const isEmailValid = email.includes('@')
   const isPasswordValid = password.length >= 6
   const isFormValid = isEmailValid && isPasswordValid
@@ -34,10 +34,9 @@ export default function SignIn({ onSignIn }: Props) {
 
     setLoading(true)
     try {
-      const auth = getAuth(app)
       await signInWithEmailAndPassword(auth, email, password)
       if (onSignIn) await Promise.resolve(onSignIn(email, password))
-      navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
+      router.replace('/(tabs)/home')
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-in failed')
     } finally {
@@ -92,7 +91,7 @@ export default function SignIn({ onSignIn }: Props) {
       </Pressable>
       <View style={styles.footerRow}>
         <Text style={styles.footerText}>Don't have an account? </Text>
-        <Pressable onPress={() => navigation.navigate('sign-up')}>
+        <Pressable onPress={() => router.push('/sign-up')}>
           <Text style={styles.linkText}>Sign up</Text>
         </Pressable>
       </View>
@@ -103,34 +102,30 @@ export default function SignIn({ onSignIn }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
     justifyContent: 'center',
+    padding: 24,
     backgroundColor: '#fff',
   },
   title: {
     fontSize: 28,
     fontWeight: '600',
-    marginBottom: 24,
+    marginBottom: 20,
     textAlign: 'center',
   },
   input: {
-    height: 48,
-    borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderColor: '#ddd',
+    padding: 12,
     marginBottom: 12,
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   button: {
-    height: 48,
     backgroundColor: '#0066ff',
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.9,
   },
   buttonText: {
     color: '#fff',
@@ -149,4 +144,7 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   footerText: { color: '#444' },
   linkText: { color: '#0066ff', fontWeight: '600' },
+  buttonPressed: {
+    opacity: 0.9, // Added to fix the missing style error
+  },
 })

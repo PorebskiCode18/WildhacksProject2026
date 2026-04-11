@@ -1,6 +1,6 @@
 import React from 'react'
 import { View, StyleSheet } from 'react-native'
-import SignIn from '../../components/sign-up'
+import SignIn from '../../components/sign-in'
 import SignUp from '../../components/sign-up'
 
 export default function TabsIndex() {
