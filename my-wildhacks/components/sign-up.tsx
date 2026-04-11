@@ -48,17 +48,42 @@ export default function SignUp() {
     status: isDarkMode ? 'light' : 'dark'
   }
 
+  // Helper: Auto-format birthday as MM/DD/YYYY
+  const formatBirthday = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    let formatted = cleaned;
+    if (cleaned.length > 2) {
+      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
+    }
+    if (cleaned.length > 4) {
+      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
+    }
+    return formatted;
+  };
+
   const handleSignUp = async () => {
     setError(null)
-    if (!email.includes('@') || password.length < 6 || !username || !firstName) {
-      setError('Please fill in all fields (Password min 6 chars)')
+
+    // 1. Basic Field Validation
+    if (!email.includes('@') || !username || !firstName) {
+      setError('Please fill in all fields correctly.')
+      return
+    }
+
+    // 2. Password Law Validation (Min 6 chars, 1 Letter, 1 Number, 1 Special Char)
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{6,}$/;
+    if (!passwordRegex.test(password)) {
+      setError('Password requires 6+ characters with a mix of letters, numbers, and symbols (!@$%).')
       return
     }
 
     setLoading(true)
     try {
+      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
+
+      // Store extra profile info in Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         firstName,
@@ -68,6 +93,7 @@ export default function SignUp() {
         email: email.toLowerCase(),
         createdAt: new Date().toISOString(),
       })
+
       router.replace('/home')
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-up failed')
@@ -86,7 +112,7 @@ export default function SignUp() {
         <LinearGradient colors={theme.gradient as any} style={StyleSheet.absoluteFill} />
 
         <SafeAreaView style={{ flex: 1 }}>
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle Button (Lowered via paddingTop) */}
           <View style={styles.headerAction}>
             <Pressable 
               onPress={() => setIsDarkMode(!isDarkMode)}
@@ -100,7 +126,7 @@ export default function SignUp() {
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
 
             <View style={styles.row}>
@@ -133,8 +159,13 @@ export default function SignUp() {
               placeholder="Birthday (MM/DD/YYYY)"
               placeholderTextColor={theme.placeholder}
               value={birthday}
-              onChangeText={setBirthday}
+              onChangeText={(text) => {
+                const formatted = formatBirthday(text);
+                if (formatted.length <= 10) setBirthday(formatted);
+              }}
               style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+              keyboardType="number-pad"
+              maxLength={10}
             />
 
             <TextInput
@@ -201,7 +232,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 30, // Lowered icon position
   },
   iconCircle: {
     width: 44,
@@ -214,7 +245,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
-    paddingTop: 0,
+    paddingTop: 10,
   },
   title: {
     fontSize: 32,
@@ -270,10 +301,13 @@ const styles = StyleSheet.create({
     color: '#ff4444',
     marginBottom: 10,
     textAlign: 'center',
+    fontSize: 13,
+    paddingHorizontal: 10,
   },
   link: {
     marginTop: 20,
     textAlign: 'center',
     fontSize: 14,
+    fontWeight: '600',
   },
 })
