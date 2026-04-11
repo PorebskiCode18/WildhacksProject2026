@@ -37,7 +37,7 @@ export default function SignUp({ onSignUp }: Props) {
       const auth = getAuth()
       await createUserWithEmailAndPassword(auth, email, password)
       if (onSignUp) await Promise.resolve(onSignUp(email, password))
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] })
+      navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
     } catch (err: any) {
       setError(err?.message ?? 'Sign-up failed')
     } finally {
@@ -93,7 +93,7 @@ export default function SignUp({ onSignUp }: Props) {
 
       <View style={styles.footerRow}>
         <Text style={styles.footerText}>Already have an account? </Text>
-        <Pressable onPress={() => navigation.navigate('SignIn')}>
+        <Pressable onPress={() => navigation.navigate('sign-in')}>
           <Text style={styles.linkText}>Sign in</Text>
         </Pressable>
       </View>
