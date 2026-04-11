@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
-import { useNavigation } from '@react-navigation/native'
-import { app } from '../firebaseConfig' // Import the exported Firebase app
+import { useRouter } from 'expo-router'
+import { auth } from '../firebaseConfig'
 
 type Props = {
   onSignUp?: (email: string, password: string) => Promise<void> | void
@@ -20,7 +20,8 @@ export default function SignUp({ onSignUp }: Props) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const navigation = useNavigation<any>()
+
+  const router = useRouter()
 
   const isEmailValid = email.includes('@')
   const isPasswordValid = password.length >= 6
@@ -35,11 +36,13 @@ export default function SignUp({ onSignUp }: Props) {
 
     setLoading(true)
     try {
-      const auth = getAuth(app)
-      await createUserWithEmailAndPassword(auth, email, password)
+      const authInstance = auth
+      await createUserWithEmailAndPassword(authInstance, email, password)
+
       if (onSignUp) await Promise.resolve(onSignUp(email, password))
-      navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
-      navigation.navigate('Home');
+
+      router.replace('/(tabs)/home')
+
     } catch (err) {
       setError((err as any)?.message ?? 'Sign-up failed')
     } finally {
@@ -58,12 +61,7 @@ export default function SignUp({ onSignUp }: Props) {
         keyboardType="email-address"
         autoCapitalize="none"
         style={styles.input}
-        accessible
-        accessibilityLabel="email"
       />
-      {email && !isEmailValid ? (
-        <Text style={styles.validationText}>Enter a valid email address.</Text>
-      ) : null}
 
       <TextInput
         value={password}
@@ -71,20 +69,14 @@ export default function SignUp({ onSignUp }: Props) {
         placeholder="Password"
         secureTextEntry
         style={styles.input}
-        accessible
-        accessibilityLabel="password"
       />
-      {password && !isPasswordValid ? (
-        <Text style={styles.validationText}>Password must be at least 6 characters.</Text>
-      ) : null}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        style={styles.button}
         onPress={handleSignUp}
         disabled={loading || !isFormValid}
-        accessibilityRole="button"
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
@@ -94,8 +86,8 @@ export default function SignUp({ onSignUp }: Props) {
       </Pressable>
 
       <View style={styles.footerRow}>
-        <Text style={styles.footerText}>Already have an account? </Text>
-        <Pressable onPress={() => navigation.navigate('sign-in')}>
+        <Text>Already have an account? </Text>
+        <Pressable onPress={() => router.push('/sign-in')}>
           <Text style={styles.linkText}>Sign in</Text>
         </Pressable>
       </View>
@@ -108,13 +100,13 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // Ensure consistent background
   },
   title: {
     fontSize: 28,
     fontWeight: '600',
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: 'center', // Ensure consistent title alignment
   },
   input: {
     height: 48,
@@ -132,10 +124,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
   },
-  buttonPressed: { opacity: 0.9 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-  errorText: { color: '#cc0000', marginTop: 8, textAlign: 'center' },
-  validationText: { color: '#cc0000', marginTop: 6, fontSize: 13 },
+  buttonPressed: {
+    opacity: 0.9,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  errorText: {
+    color: '#cc0000',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  validationText: {
+    color: '#cc0000',
+    marginTop: 6,
+    fontSize: 13,
+  },
   footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   footerText: { color: '#444' },
   linkText: { color: '#0066ff', fontWeight: '600' },
