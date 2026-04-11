@@ -38,7 +38,11 @@ export default function SignIn({ onSignIn }: Props) {
       const auth = getAuth()
       await signInWithEmailAndPassword(auth, email, password)
       if (onSignIn) await Promise.resolve(onSignIn(email, password))
+<<<<<<< HEAD
       navigation.reset({ index: 0, routes: [{ name: 'home' }] })
+=======
+      navigation.reset({ index: 0, routes: [{ name: '(tabs)' }] })
+>>>>>>> 4d191d752f1bd0d81028f2dbe902e024e7c04906
     } catch (err: any) {
       setError(err?.message ?? 'Sign-in failed')
     } finally {
@@ -94,6 +98,7 @@ export default function SignIn({ onSignIn }: Props) {
       <View style={styles.footerRow}>
         <Text style={styles.footerText}>Don't have an account? </Text>
         <Pressable onPress={() => navigation.navigate('SignUp')}>
+        <Pressable onPress={() => navigation.navigate('sign-up')}>
           <Text style={styles.linkText}>Sign up</Text>
         </Pressable>
       </View>
