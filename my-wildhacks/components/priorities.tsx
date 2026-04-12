@@ -175,6 +175,14 @@ export default function PrioritiesScreen() {
           </Pressable>
         </View>
 
+        {/* 2. New Full-Width Description */}
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.descriptionText}>
+            How do you want to spend your free time? Enter a Priority of yours above and hit the + sign to add it to your list. 
+            Arrange them in order of what is most important to you and your AI assistant will help you find time for the things you value in life.
+          </Text>
+        </View>
+
         {loading ? (
           <ActivityIndicator color={themeColor} style={{ marginTop: 50 }} />
         ) : (
@@ -232,5 +240,27 @@ const styles = StyleSheet.create({
   numberText: {
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  centeredHeader: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  descriptionContainer: {
+    width: '100%',
+    marginBottom: 25,
+    // Add significant padding to the sides to "squeeze" the text inward
+    paddingHorizontal: 15, 
+  },
+  descriptionText: {
+    color: '#aaa',
+    fontSize: 13,
+    lineHeight: 20, // Increased line height for better readability
+    textAlign: 'center', // Changed to center to match the new "priorities list" header
   },
 });
