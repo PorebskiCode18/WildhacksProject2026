@@ -25,16 +25,6 @@ interface PriorityItem {
   index: number;
 }
 
-<<<<<<< Updated upstream
-// 2. Define the Component
-const priorities = ({ title = "Priorities" }: Props) => {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.text}>{title}</Text>
-    </View>
-  );
-};
-=======
 export default function PrioritiesScreen() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<PriorityItem[]>([]);
@@ -146,6 +136,11 @@ export default function PrioritiesScreen() {
       <View style={styles.container}>
         <LinearGradient colors={['#000000', '#1a0f05', '#2a1a0a']} style={StyleSheet.absoluteFill} />
 
+        {/* 1. New Center-Aligned Header */}
+        <View style={styles.centeredHeader}>
+          <Text style={styles.headerTitle}>Priorities List</Text>
+        </View>
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -159,22 +154,29 @@ export default function PrioritiesScreen() {
           </Pressable>
         </View>
 
+        {/* 2. New Full-Width Description */}
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.descriptionText}>
+            How do you want to spend your free time? Enter a Priority of yours above and hit the + sign to add it to your list. 
+            Arrange them in order of what is most important to you and your AI assistant will help you find time for the things you value in life.
+          </Text>
+        </View>
+
         {loading ? (
           <ActivityIndicator color="#ff9d33" style={{ marginTop: 50 }} />
         ) : (
           <DraggableFlatList
-          data={items}
-          onDragEnd={({ data }) => handleDragEnd(data)}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          // Added this prop to help with layout calculations
-          containerStyle={{ flex: 1 }}
-        />)}
+            data={items}
+            onDragEnd={({ data }) => handleDragEnd(data)}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            containerStyle={{ flex: 1 }}
+          />
+        )}
       </View>
     </GestureHandlerRootView>
   );
 }
->>>>>>> Stashed changes
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 60 },
@@ -222,5 +224,27 @@ const styles = StyleSheet.create({
     color: '#ff9d33',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  centeredHeader: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  descriptionContainer: {
+    width: '100%',
+    marginBottom: 25,
+    // Add significant padding to the sides to "squeeze" the text inward
+    paddingHorizontal: 15, 
+  },
+  descriptionText: {
+    color: '#aaa',
+    fontSize: 13,
+    lineHeight: 20, // Increased line height for better readability
+    textAlign: 'center', // Changed to center to match the new "priorities list" header
   },
 });
