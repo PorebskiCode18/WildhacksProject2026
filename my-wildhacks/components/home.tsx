@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig'; 
-import { doc, getDoc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, orderBy, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
+
+// NEW: Agent Imports
+import { generateScheduleSuggestions, PriorityItem, CalendarEvent } from '../services/ScheduleAgent';
 
 const QUICK_ACTIONS = [
   { id: '1', icon: 'calendar', label: 'Calendar', path: '/calendar' },
@@ -22,6 +25,10 @@ export default function Home() {
 
   // Events State
   const [todaysEvents, setTodaysEvents] = useState<any[]>([]);
+
+  // NEW: AI Suggestion States
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestedBlocks, setSuggestedBlocks] = useState<any[]>([]);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -79,6 +86,73 @@ export default function Home() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !is24Hour });
   };
 
+  // NEW: Fetch AI Suggestions Logic
+  const handleSuggestSchedule = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    setIsSuggesting(true);
+    setSuggestedBlocks([]); 
+
+    try {
+      const pSnap = await getDocs(query(collection(db, 'users', user.uid, 'ranking'), orderBy('index', 'asc')));
+      const priorities: PriorityItem[] = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as PriorityItem));
+
+      if (priorities.length === 0) {
+        Alert.alert("No Priorities", "Please add some items to your Priorities list first!");
+        setIsSuggesting(false);
+        return;
+      }
+
+      const targetEvents: CalendarEvent[] = todaysEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.eStart,
+        end: e.eEnd,
+        location: e.location || null
+      }));
+
+      const now = new Date();
+      const targetDateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+
+      const suggestions = await generateScheduleSuggestions(targetDateObj, targetEvents, priorities);
+
+      if (suggestions && Array.isArray(suggestions)) {
+        setSuggestedBlocks(suggestions);
+      } else if (suggestions?.message) {
+        Alert.alert("Schedule Full", suggestions.message);
+      } else {
+        Alert.alert("Error", "Could not generate a schedule at this time.");
+      }
+    } catch (error) {
+      console.error("Agent Error:", error);
+      Alert.alert("Error", "Something went wrong communicating with the AI.");
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  // NEW: Accept/Reject Handlers
+  const acceptSuggestion = async (suggestion: any) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const eventData = { 
+      title: suggestion.suggestedPriorityTitle, 
+      location: null,
+      start: Timestamp.fromDate(suggestion.gapStart), 
+      end: Timestamp.fromDate(suggestion.gapEnd), 
+      color: themeColor 
+    };
+    
+    await addDoc(collection(db, 'users', user.uid, 'events'), eventData);
+    setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== suggestion.gapIndex));
+  };
+
+  const rejectSuggestion = (gapIndex: number) => {
+    setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== gapIndex));
+  };
+
   // Helper for text visibility on changing backgrounds
   const dynamicColor = lightMode ? '#000000' : '#FFFFFF';
   const cardBg = lightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)';
@@ -114,25 +188,60 @@ export default function Home() {
             </Pressable>
           </View>
 
-          {/* Suggested Events Card */}
+          {/* Suggested Events Card - UPDATED FOR AI */}
           <View style={[styles.glassCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: themeColor, marginBottom: 15 }]}>Suggested Events</Text>
-            
-            <View style={styles.suggestionItem}>
-              <View style={styles.suggestionTextContainer}>
-                <Text style={[styles.suggestionTitle, { color: dynamicColor }]}>Coffee with Sarah</Text>
-                <Text style={[styles.suggestionTime, { color: lightMode ? '#666' : '#aaa' }]}>Tomorrow, 10:00 AM</Text>
-              </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+              <Text style={[styles.cardTitle, { color: themeColor, marginBottom: 0 }]}>Suggested Events</Text>
               
-              <View style={styles.suggestionActions}>
-                <Pressable style={[styles.actionButton, { backgroundColor: themeColor + '22' }]}>
-                  <Ionicons name="checkmark" size={18} color={themeColor} />
-                </Pressable>
-                <Pressable style={[styles.actionButton, { backgroundColor: 'rgba(255, 68, 68, 0.15)' }]}>
-                  <Ionicons name="close" size={18} color="#ff4444" />
-                </Pressable>
-              </View>
+              <Pressable 
+                onPress={handleSuggestSchedule} 
+                disabled={isSuggesting}
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: themeColor + (isSuggesting ? '44' : '22'), paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}
+              >
+                {isSuggesting ? (
+                  <ActivityIndicator size="small" color={themeColor} />
+                ) : (
+                  <>
+                    <Ionicons name="sparkles" size={14} color={themeColor} />
+                    <Text style={{ color: themeColor, fontSize: 12, fontWeight: 'bold', marginLeft: 4 }}>Auto-Fill</Text>
+                  </>
+                )}
+              </Pressable>
             </View>
+            
+            {suggestedBlocks.length === 0 && !isSuggesting ? (
+              <Text style={{ color: lightMode ? '#888' : '#777', textAlign: 'center', marginVertical: 10, fontSize: 13 }}>
+                Tap Auto-Fill to find gaps in your schedule!
+              </Text>
+            ) : (
+              suggestedBlocks.map((sug) => (
+                <View key={`sug-${sug.gapIndex}`} style={styles.suggestionItem}>
+                  <View style={styles.suggestionTextContainer}>
+                    <Text style={[styles.suggestionTitle, { color: dynamicColor }]} numberOfLines={1}>
+                      {sug.suggestedPriorityTitle}
+                    </Text>
+                    <Text style={[styles.suggestionTime, { color: lightMode ? '#666' : '#aaa' }]}>
+                      {formatTime(sug.gapStart)} - {formatTime(sug.gapEnd)}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.suggestionActions}>
+                    <Pressable 
+                      style={[styles.actionButton, { backgroundColor: themeColor + '22' }]}
+                      onPress={() => acceptSuggestion(sug)}
+                    >
+                      <Ionicons name="checkmark" size={18} color={themeColor} />
+                    </Pressable>
+                    <Pressable 
+                      style={[styles.actionButton, { backgroundColor: 'rgba(255, 68, 68, 0.15)' }]}
+                      onPress={() => rejectSuggestion(sug.gapIndex)}
+                    >
+                      <Ionicons name="close" size={18} color="#ff4444" />
+                    </Pressable>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
 
           {/* NEW: Today's Events Card */}
