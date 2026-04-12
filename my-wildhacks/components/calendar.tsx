@@ -384,7 +384,7 @@ console.log("Sorted Priorities:", priorities);
                 
                 return (
                   <View 
-                    key={`sug-${sug.gapIndex}`} 
+                    key={sug.tempId}
                     style={[
                       styles.absoluteEvent, 
                       styles.suggestedEvent, 

@@ -85,27 +85,7 @@ export const generateScheduleSuggestions = async (
       activityCounts[data.title]++;
     }
   });
-// --- DEBUG LOGGING ---
-console.log("!!! [DEBUG] RAW PRIORITIES ARRAY:", priorities); // Log the raw object first
 
-if (priorities && priorities.length > 0) {
-  priorities.forEach((p, i) => {
-    console.log(`Priority ${i}:`, Object.keys(p)); // This tells us what keys actually exist
-  });
-
-  console.log("!!! [DEBUG] MAPPED DATA:", JSON.stringify(
-    priorities.map(p => ({ 
-      id: p.id || 'MISSING ID', 
-      title: p.text || 'MISSING TITLE', 
-      rank: p.index !== undefined ? p.index : 'MISSING RANK',
-      address: p.location?.address || 'MISSING ADDRESS' 
-    })), 
-    null, 
-    2
-  ));
-} else {
-  console.warn("!!! [DEBUG] Priorities array is NULL or LENGTH 0");
-}
 
 
   // --- Step 4: Refined AI Prompt for Maximum Efficiency ---
@@ -128,8 +108,9 @@ if (priorities && priorities.length > 0) {
     - NEVER EVER USE OR SAY THE ID
     - NEVER EVER USE LOCATION FOR EVENT TITLE
     - USE GIVEN PRIORITY TITLES IN SUGGESTIONS
+    - LOOK AT ALREADY SCHEDULED EVENTS AND DONT REPEAT ACTIVITIES IN A DAY
     - DON'T REPEAT PRIORITIES: Each priority can only be suggested once per day.
-    - BASE TIME FRAME OF SUGGESTION BASED ON ACTIVITY: DONT JUST FILL THE GAP< FIT THE ACTIVITY
+    - BASE TIME FRAME OF SUGGESTION BASED ON ACTIVITY: DONT JUST FILL THE GAP, FIT THE ACTIVITY
     - DONT JUST PLACE THE PRIORITIES IN ORDER UNLESS IT MAKES SENSE TO DO SO. BE FLEXIBLE AND CREATIVE WITH THE SUGGESTIONS.
     - SUGGEST UNIQUE ACTIVITIES OUTSIDE OF PRIORITIES IF THEY FIT PERFECTLY IN A GAP (e.g., "Quick Walk", "Coffee Break") but only if they don't have a perfect priority match.
     - SUGGEST ACTIVITIES BASED ON HISTORY IF PRIORITIES ALL USED
@@ -155,33 +136,43 @@ if (priorities && priorities.length > 0) {
   `;
 
   // --- Step 5: Parse and Map Response ---
-  console.log("Step 5: Parsing Response...");
-  try {
-    const result = await model.generateContent(prompt);
-    let responseText = result.response.text();
-    
-    responseText = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
-    
-    const suggestedSchedule = JSON.parse(responseText);
-    
-    // Safety check: Ensure suggestedSchedule is an array
-    if (!Array.isArray(suggestedSchedule)) {
-        throw new Error("AI did not return an array");
-    }
+ // --- Step 5: Parse and Map Response ---
+console.log("Step 5: Parsing Response...");
+try {
+  const result = await model.generateContent(prompt);
+  let responseText = result.response.text();
+  
+  responseText = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+  
+  const suggestedSchedule = JSON.parse(responseText);
+  
+  if (!Array.isArray(suggestedSchedule)) {
+      throw new Error("AI did not return an array");
+  }
 
-    return suggestedSchedule.map((suggestion: any, index: number) => ({
+  return suggestedSchedule.map((suggestion: any, index: number) => {
+    // 1. Find the original priority data to ensure Rank/Title are never missing
+    const original = priorities.find(p => p.id === suggestion.suggestedPriorityId);
+
+    return {
       ...suggestion,
-      tempId: `sug-${suggestion.gapIndex}-${index}-${Date.now()}`, // Added timestamp for extra uniqueness
+      // 2. FIX: Generate a truly unique key using gapIndex, the loop index, and a timestamp
+      // This prevents the "sug-0" duplicate key error
+      tempId: `gap-${suggestion.gapIndex}-item-${index}-${Date.now()}`,
+      
+      // 3. Ensure Title and Rank are pulled from your source of truth
+      suggestedPriorityTitle: original ? original.text : suggestion.suggestedPriorityTitle,
+      rank: original ? original.index : suggestion.rank,
+      
       gapStart: new Date(suggestion.startTime), 
       gapEnd: new Date(suggestion.endTime),
-    }));
-    
-  } catch (error) {
-    console.error("AI Generation or Parsing Failed:", error);
-    return null;
-  }
- 
-};
+    };
+  });
+  
+} catch (error) {
+  console.error("AI Generation or Parsing Failed:", error);
+  return null;
+}
 
 // --- HELPER FUNCTIONS ---
 
@@ -255,4 +246,5 @@ function calculateTimeGaps(events: CalendarEvent[], targetDate: Date): TimeGap[]
   }
 
   return gaps;
+}
 }

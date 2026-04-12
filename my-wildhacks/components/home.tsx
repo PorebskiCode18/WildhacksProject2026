@@ -21,7 +21,7 @@ export default function Home() {
   // Theme States
   const [themeColor, setThemeColor] = useState('#ff9d33'); 
   const [lightMode, setLightMode] = useState(false);
-  const [is24Hour, setIs24Hour] = useState(false); // Added for time formatting
+  const [is24Hour, setIs24Hour] = useState(false); 
 
   // Events State
   const [todaysEvents, setTodaysEvents] = useState<any[]>([]);
@@ -68,7 +68,6 @@ export default function Home() {
         const eStart = data.start.toDate();
         const eEnd = data.end.toDate();
 
-        // Check if event overlaps with today
         if (eStart <= endOfDay && eEnd >= startOfDay) {
           fetched.push({ id: doc.id, ...data, eStart, eEnd });
         }
@@ -132,7 +131,7 @@ export default function Home() {
     }
   };
 
-  // NEW: Accept/Reject Handlers
+  // NEW: Accept/Reject Handlers (Using tempId for accuracy)
   const acceptSuggestion = async (suggestion: any) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -146,21 +145,19 @@ export default function Home() {
     };
     
     await addDoc(collection(db, 'users', user.uid, 'events'), eventData);
-    setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== suggestion.gapIndex));
+    setSuggestedBlocks(prev => prev.filter(s => s.tempId !== suggestion.tempId));
   };
 
-  const rejectSuggestion = (gapIndex: number) => {
-    setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== gapIndex));
+  const rejectSuggestion = (tempId: string) => {
+    setSuggestedBlocks(prev => prev.filter(s => s.tempId !== tempId));
   };
 
-  // Helper for text visibility on changing backgrounds
   const dynamicColor = lightMode ? '#000000' : '#FFFFFF';
   const cardBg = lightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)';
   const cardBorder = lightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.08)';
 
   return (
     <View style={styles.container}>
-      {/* Background Gradient */}
       <LinearGradient 
         colors={
           lightMode 
@@ -174,7 +171,6 @@ export default function Home() {
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
-          {/* Header */}
           <View style={styles.header}>
             <View>
               <Text style={[styles.greeting, { color: lightMode ? '#666' : '#aaa' }]}>Welcome back,</Text>
@@ -188,7 +184,6 @@ export default function Home() {
             </Pressable>
           </View>
 
-          {/* Suggested Events Card - UPDATED FOR AI */}
           <View style={[styles.glassCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
               <Text style={[styles.cardTitle, { color: themeColor, marginBottom: 0 }]}>Suggested Events</Text>
@@ -215,7 +210,7 @@ export default function Home() {
               </Text>
             ) : (
               suggestedBlocks.map((sug) => (
-                <View key={`sug-${sug.gapIndex}`} style={styles.suggestionItem}>
+                <View key={sug.tempId} style={styles.suggestionItem}>
                   <View style={styles.suggestionTextContainer}>
                     <Text style={[styles.suggestionTitle, { color: dynamicColor }]} numberOfLines={1}>
                       {sug.suggestedPriorityTitle}
@@ -234,7 +229,7 @@ export default function Home() {
                     </Pressable>
                     <Pressable 
                       style={[styles.actionButton, { backgroundColor: 'rgba(255, 68, 68, 0.15)' }]}
-                      onPress={() => rejectSuggestion(sug.gapIndex)}
+                      onPress={() => rejectSuggestion(sug.tempId)}
                     >
                       <Ionicons name="close" size={18} color="#ff4444" />
                     </Pressable>
@@ -244,7 +239,6 @@ export default function Home() {
             )}
           </View>
 
-          {/* NEW: Today's Events Card */}
           <View style={[styles.glassCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
             <Text style={[styles.cardTitle, { color: themeColor, marginBottom: 15 }]}>Today's Schedule</Text>
             
@@ -275,7 +269,6 @@ export default function Home() {
             )}
           </View>
 
-          {/* Quick Actions Grid */}
           <Text style={[styles.sectionTitle, { color: dynamicColor }]}>Quick Actions</Text>
           <View style={styles.grid}>
             {QUICK_ACTIONS.map((action) => (
@@ -349,8 +342,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  
-  // Suggested Events Styles
   suggestionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -380,8 +371,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // Today's Events Styles
   emptyState: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -426,8 +415,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     maxWidth: '50%',
   },
-
-  // Quick Actions Styles
   sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 15 },
   grid: {
     flexDirection: 'row',
