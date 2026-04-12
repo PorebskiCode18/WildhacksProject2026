@@ -182,9 +182,8 @@ export default function FullCalendar() {
 
     try {
       // 1. Fetch the user's priorities
-      const pSnap = await getDocs(query(collection(db, 'users', user.uid, 'priorities'), orderBy('rank', 'asc')));
+      const pSnap = await getDocs(query(collection(db, 'users', user.uid, 'ranking'), orderBy('rank', 'asc')));
       const priorities: PriorityItem[] = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as PriorityItem));
-      console.log("Fetched Priority Docs Count:", pSnap.docs.length);
 
       if (priorities.length === 0) {
         Alert.alert("No Priorities", "Please add some items to your Priorities list first!");

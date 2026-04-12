@@ -108,10 +108,15 @@ export const generateScheduleSuggestions = async (
     ${JSON.stringify(activityCounts, null, 2)}
     
     CRITICAL INSTRUCTIONS:
-    - You must assign exactly ONE priority to each free time gap.
+    - base suggestions primarily off of the name of the priority, not the location, but use the location for travel logic.
+    - You must assign at least ONE priority to each free time gap.
     - Ensure the priority makes sense for the 'durationMinutes' of the gap.
     - Consider travel logistics: look at 'comingFrom' and 'goingTo'. Do not suggest a priority location that is wildly impractical to travel to between those two points.
     - BALANCE: While rank is important, variety is vital. If a high-rank priority has a high history count, you MUST suggest lower-ranked priorities that the user enjoys but hasn't done recently to prevent burnout.
+    - Given a large gap in time, defer to multiple priorities over a single one to maximize variety and engagement.
+    - Approximate the length of the event based on the activity in the name of the priority (e.g., "Go for a run" might be 30-60 mins, "Read a book" might be 60+ mins, "Meditate" might be 10-20 mins). Use this to determine how many priorities can fit in each gap.
+    - Leave appropriate gaps between activities for travel and rest, both scheduled and suggested
+
     
     OUTPUT FORMAT:
     You must return a raw JSON array containing objects for each gap. Do not include markdown blocks (like \`\`\`json). Just the raw JSON.
