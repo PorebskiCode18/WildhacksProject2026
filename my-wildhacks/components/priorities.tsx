@@ -177,10 +177,13 @@ export default function PrioritiesScreen() {
 
         {/* 2. New Full-Width Description */}
         <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText}>
-            How do you want to spend your free time? Enter a Priority of yours above and hit the + sign to add it to your list. 
-            Arrange them in order of what is most important to you and your AI assistant will help you find time for the things you value in life.
-          </Text>
+          <Text style={[
+  styles.descriptionText, 
+  { color: lightMode ? '#444' : '#aaa' } 
+]}>
+  How do you want to spend your free time? Enter a Priority of yours above and hit the + sign to add it to your list. 
+  Arrange them in order of what is most important to you and your AI assistant will help you find time for the things you value in life.
+</Text>
         </View>
 
         {loading ? (
