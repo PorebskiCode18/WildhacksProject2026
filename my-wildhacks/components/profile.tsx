@@ -7,13 +7,16 @@ import {
   Switch, 
   Image, 
   ScrollView, 
-  Dimensions 
+  Dimensions,
+  Alert,
+  Linking 
 } from 'react-native';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { signOut } from 'firebase/auth';
+import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -36,15 +39,30 @@ const APP_THEMES = [
 ];
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const navigation = useNavigation();
   const user = auth.currentUser;
   
   const [is24Hour, setIs24Hour] = useState(false);
   const [lightMode, setLightMode] = useState(false); 
   const [themeColor, setThemeColor] = useState('#1a0f0a');
+  const [userData, setUserData] = useState({ username: '' });
 
   useEffect(() => {
     if (!user) return;
-    
+
+    const fetchUser = async () => {
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          setUserData({ username: userDocSnap.data().username });
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
     const unsub = onSnapshot(doc(db, 'users', user.uid, 'settings', 'eventConfig'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -54,8 +72,9 @@ export default function ProfileScreen() {
       }
     });
 
+    fetchUser();
     return () => unsub();
-  }, []);
+  }, [user]);
 
   const updateSetting = async (key: string, value: any) => {
     if (!user) return;
@@ -64,12 +83,21 @@ export default function ProfileScreen() {
     }, { merge: true });
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => {
+    router.replace('/sign-in');
+  };
 
-  // Theme Helpers
+  const handlePlayVideo = async () => {
+    const url = 'https://www.youtube.com/watch?v=BOksW_NabEk';
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Error", "Don't know how to open this URL");
+    }
+  };
+
   const dynamicContentColor = lightMode ? '#000' : '#fff';
-  
-  // Implementation of your requested transparency logic
   const dynamicCardBg = lightMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.04)';
   const dynamicBorder = lightMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.06)';
 
@@ -82,22 +110,27 @@ export default function ProfileScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
         <View style={styles.header}>
           <View style={[styles.avatarBorder, { borderColor: themeColor === '#161616' ? '#333' : themeColor }]}>
-            <Image 
-              source={{ uri: user?.photoURL || 'https://via.placeholder.com/150' }} 
-              style={styles.avatar} 
-            />
+            <Pressable onPress={handlePlayVideo} style={styles.avatarContainer}>
+              <Image 
+                source={{ uri: user?.photoURL || 'https://via.placeholder.com/150' }} 
+                style={styles.avatar} 
+              />
+              <View style={styles.playOverlay}>
+                <Ionicons name="play" size={40} color="#fff" style={{ marginLeft: 5 }} />
+              </View>
+            </Pressable>
           </View>
-          <Text style={[styles.userName, { color: dynamicContentColor }]}>{user?.displayName || 'Calendar User'}</Text>
+          <Text style={[styles.userName, { color: dynamicContentColor }]}>
+            {userData?.username || 'Calendar User'}
+          </Text>
           <View style={styles.statusBadge}>
             <View style={styles.greenDot} />
             <Text style={styles.statusText}>Cloud Synced</Text>
           </View>
         </View>
 
-        {/* Section: App Atmosphere */}
         <Text style={styles.sectionLabel}>App Atmosphere</Text>
         <View style={[styles.card, { backgroundColor: dynamicCardBg, borderColor: dynamicBorder }]}>
           <Text style={styles.cardSubText}>Select a theme to define your workspace vibe</Text>
@@ -122,7 +155,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Section: Appearance Switches */}
         <View style={[styles.card, { backgroundColor: dynamicCardBg, borderColor: dynamicBorder }]}>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
@@ -138,7 +170,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Section: Preferences */}
         <Text style={styles.sectionLabel}>Preferences</Text>
         <View style={[styles.card, { backgroundColor: dynamicCardBg, borderColor: dynamicBorder }]}>
           <View style={styles.settingRow}>
@@ -155,7 +186,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Section: Account */}
         <Text style={styles.sectionLabel}>Account</Text>
         <Pressable 
           style={[styles.card, { backgroundColor: dynamicCardBg, borderColor: dynamicBorder }]} 
@@ -164,7 +194,7 @@ export default function ProfileScreen() {
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Ionicons name="log-out-outline" size={22} color="#ff4444" />
-              <Text style={[styles.settingText, { color: '#ff4444' }]}>Sign Out</Text>
+              <Text style={[styles.settingText, { color: '#ff4444' }]}>Go to Login</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#444" />
           </View>
@@ -181,7 +211,15 @@ const styles = StyleSheet.create({
   scrollContent: { paddingTop: 80, paddingHorizontal: 20, paddingBottom: 50 },
   header: { alignItems: 'center', marginBottom: 35 },
   avatarBorder: { padding: 4, borderRadius: 60, borderWidth: 2, marginBottom: 15 },
-  avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#222' },
+  avatarContainer: { width: 100, height: 100, borderRadius: 50, overflow: 'hidden' },
+  avatar: { width: '100%', height: '100%', backgroundColor: '#222' },
+  playOverlay: { 
+    position: 'absolute', 
+    top: 0, left: 0, right: 0, bottom: 0, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.4)' 
+  },
   userName: { fontSize: 24, fontWeight: 'bold' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: 'rgba(0, 255, 0, 0.08)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
   greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00ff00', marginRight: 6 },
@@ -190,7 +228,7 @@ const styles = StyleSheet.create({
   cardSubText: { color: '#888', fontSize: 12, marginBottom: 15, textAlign: 'center' },
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' },
   themeCircle: { width: '18%', aspectRatio: 1, borderRadius: 25, borderWidth: 2, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  card: { borderRadius: 24, padding: 18, borderWidth: 1, marginBottom: 12, overflow: 'hidden' }, // Base styles here
+  card: { borderRadius: 24, padding: 18, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   settingInfo: { flexDirection: 'row', alignItems: 'center' },
   settingText: { fontSize: 16, fontWeight: '500', marginLeft: 15 },

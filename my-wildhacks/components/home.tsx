@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable, Dimensions
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig'; 
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 
 const QUICK_ACTIONS = [
@@ -17,13 +17,17 @@ export default function Home() {
   
   // Theme States
   const [themeColor, setThemeColor] = useState('#ff9d33'); 
-  const [lightMode, setLightMode] = useState(false); // Updated from pureBlackMode
+  const [lightMode, setLightMode] = useState(false);
+  const [is24Hour, setIs24Hour] = useState(false); // Added for time formatting
+
+  // Events State
+  const [todaysEvents, setTodaysEvents] = useState<any[]>([]);
 
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    // 1. Fetch User Data (firstName)
+    // 1. Fetch User Data
     const fetchUser = async () => {
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -39,12 +43,41 @@ export default function Home() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.themeColor) setThemeColor(data.themeColor);
-        if (data.lightMode !== undefined) setLightMode(data.lightMode); // Listen for lightMode
+        if (data.lightMode !== undefined) setLightMode(data.lightMode); 
+        if (data.is24Hour !== undefined) setIs24Hour(data.is24Hour);
       }
     });
 
-    return () => unsubTheme();
+    // 3. Real-time Events Listener (Filtered for Today)
+    const q = query(collection(db, 'users', user.uid, 'events'), orderBy('start', 'asc'));
+    const unsubEvents = onSnapshot(q, (snapshot) => {
+      const fetched: any[] = [];
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const eStart = data.start.toDate();
+        const eEnd = data.end.toDate();
+
+        // Check if event overlaps with today
+        if (eStart <= endOfDay && eEnd >= startOfDay) {
+          fetched.push({ id: doc.id, ...data, eStart, eEnd });
+        }
+      });
+      setTodaysEvents(fetched);
+    });
+
+    return () => {
+      unsubTheme();
+      unsubEvents();
+    };
   }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !is24Hour });
+  };
 
   // Helper for text visibility on changing backgrounds
   const dynamicColor = lightMode ? '#000000' : '#FFFFFF';
@@ -53,7 +86,7 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Background Gradient: Sunrise logic */}
+      {/* Background Gradient */}
       <LinearGradient 
         colors={
           lightMode 
@@ -65,7 +98,7 @@ export default function Home() {
       />
 
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           {/* Header */}
           <View style={styles.header}>
@@ -81,13 +114,56 @@ export default function Home() {
             </Pressable>
           </View>
 
-          {/* Featured Card */}
+          {/* Suggested Events Card */}
           <View style={[styles.glassCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: themeColor }]}>Upcoming Task</Text>
-            <Text style={[styles.cardSubtitle, { color: dynamicColor }]}>Design Calendar UI</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '70%', backgroundColor: themeColor }]} />
+            <Text style={[styles.cardTitle, { color: themeColor, marginBottom: 15 }]}>Suggested Events</Text>
+            
+            <View style={styles.suggestionItem}>
+              <View style={styles.suggestionTextContainer}>
+                <Text style={[styles.suggestionTitle, { color: dynamicColor }]}>Coffee with Sarah</Text>
+                <Text style={[styles.suggestionTime, { color: lightMode ? '#666' : '#aaa' }]}>Tomorrow, 10:00 AM</Text>
+              </View>
+              
+              <View style={styles.suggestionActions}>
+                <Pressable style={[styles.actionButton, { backgroundColor: themeColor + '22' }]}>
+                  <Ionicons name="checkmark" size={18} color={themeColor} />
+                </Pressable>
+                <Pressable style={[styles.actionButton, { backgroundColor: 'rgba(255, 68, 68, 0.15)' }]}>
+                  <Ionicons name="close" size={18} color="#ff4444" />
+                </Pressable>
+              </View>
             </View>
+          </View>
+
+          {/* NEW: Today's Events Card */}
+          <View style={[styles.glassCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+            <Text style={[styles.cardTitle, { color: themeColor, marginBottom: 15 }]}>Today's Schedule</Text>
+            
+            {todaysEvents.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="calendar-clear-outline" size={32} color={lightMode ? '#ccc' : '#444'} style={{ marginBottom: 10 }} />
+                <Text style={[styles.emptyText, { color: lightMode ? '#888' : '#666' }]}>Your day is clear!</Text>
+              </View>
+            ) : (
+              todaysEvents.map((event, index) => (
+                <View key={event.id} style={[styles.todayEventItem, index !== todaysEvents.length - 1 && styles.borderBottom]}>
+                  <View style={[styles.eventDot, { backgroundColor: event.color || themeColor }]} />
+                  <View style={styles.todayEventDetails}>
+                    <Text style={[styles.todayEventTitle, { color: dynamicColor }]} numberOfLines={1}>{event.title}</Text>
+                    <View style={styles.todayEventSubInfo}>
+                      <Text style={[styles.todayEventTime, { color: lightMode ? '#666' : '#aaa' }]}>
+                        {formatTime(event.eStart)} - {formatTime(event.eEnd)}
+                      </Text>
+                      {event.location ? (
+                        <Text style={[styles.todayEventLoc, { color: lightMode ? '#888' : '#777' }]} numberOfLines={1}>
+                          <Ionicons name="location" size={16} /> {event.location}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
 
           {/* Quick Actions Grid */}
@@ -134,7 +210,7 @@ function ActionSquare({ icon, label, onPress, themeColor, dynamicColor, cardBg, 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  scrollContent: { padding: 24 },
+  scrollContent: { padding: 24, paddingBottom: 50 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -164,14 +240,85 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  cardSubtitle: { fontSize: 22, fontWeight: '600', marginVertical: 10 },
-  progressBar: {
-    height: 6,
-    backgroundColor: 'rgba(120, 120, 120, 0.1)',
-    borderRadius: 3,
-    marginTop: 10,
+  
+  // Suggested Events Styles
+  suggestionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
   },
-  progressFill: { height: '100%', borderRadius: 3 },
+  suggestionTextContainer: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  suggestionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  suggestionTime: {
+    fontSize: 13,
+  },
+  suggestionActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Today's Events Styles
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  todayEventItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  borderBottom: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  eventDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 15,
+  },
+  todayEventDetails: {
+    flex: 1,
+  },
+  todayEventTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  todayEventSubInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  todayEventTime: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  todayEventLoc: {
+    fontSize: 16,
+    maxWidth: '50%',
+  },
+
+  // Quick Actions Styles
   sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 15 },
   grid: {
     flexDirection: 'row',

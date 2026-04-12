@@ -44,7 +44,7 @@ export default function SignIn() {
   const handleSignIn = async () => {
     setError(null);
     if (!email.includes('@') || password.length < 6) {
-      setError('Invalid email or password (min 6 chars)');
+      setError('Invalid email or password');
       return;
     }
 
@@ -53,7 +53,7 @@ export default function SignIn() {
       await signInWithEmailAndPassword(auth, email, password);
       router.replace('/home');
     } catch (err) {
-      setError((err as any)?.message ?? 'Sign-in failed');
+      setError('Invalid Email or Password');
     } finally {
       setLoading(false);
     }

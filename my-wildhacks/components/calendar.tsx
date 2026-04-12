@@ -37,18 +37,18 @@ export default function FullCalendar() {
   // Customization & Global States
   const [themeColor, setThemeColor] = useState('#ff8c00');
   const [is24Hour, setIs24Hour] = useState(false); 
-  const [lightMode, setLightMode] = useState(false); // Updated: Background Logic
+  const [lightMode, setLightMode] = useState(false); 
   const [categoryLabels, setCategoryLabels] = useState<any>({
     '#ff8c00': 'General', '#ff4444': 'Urgent', '#00d4ff': 'Social', 
     '#ccff00': 'Health', '#ff00ff': 'Personal', '#ffffff': 'Other', '#8e44ad': 'Work'
   });
 
-  // Dynamic Content Color
   const dynamicColor = lightMode ? '#000000' : '#FFFFFF';
 
   // Form State
   const [showAddModal, setShowAddModal] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
+  const [eventLocation, setEventLocation] = useState(''); // New State
   const [eventColor, setEventColor] = useState('#ff8c00');
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date());
@@ -58,11 +58,10 @@ export default function FullCalendar() {
 
   const translateY = useRef(new Animated.Value(DRAWER_CLOSED_Y)).current;
 
-  // Sync Calendar Theme
   const dynamicTheme = useMemo(() => ({
     calendarBackground: 'transparent',
     textSectionTitleColor: themeColor,
-    dayTextColor: dynamicColor, // Adjusts based on Light/Dark
+    dayTextColor: dynamicColor,
     monthTextColor: themeColor,
     textMonthFontWeight: '700' as const,
     textMonthFontSize: 22,
@@ -100,7 +99,7 @@ export default function FullCalendar() {
         if (data.labels) setCategoryLabels(data.labels);
         if (data.themeColor) setThemeColor(data.themeColor);
         if (data.is24Hour !== undefined) setIs24Hour(data.is24Hour);
-        if (data.lightMode !== undefined) setLightMode(data.lightMode); // Corrected listener
+        if (data.lightMode !== undefined) setLightMode(data.lightMode);
       }
     });
 
@@ -120,7 +119,13 @@ export default function FullCalendar() {
     if (!eventTitle.trim()) return;
     const user = auth.currentUser;
     if (!user) return;
-    const eventData = { title: eventTitle, start: Timestamp.fromDate(startTime), end: Timestamp.fromDate(endTime), color: eventColor };
+    const eventData = { 
+      title: eventTitle, 
+      location: eventLocation, // Save Location
+      start: Timestamp.fromDate(startTime), 
+      end: Timestamp.fromDate(endTime), 
+      color: eventColor 
+    };
     if (editingEventId) await updateDoc(doc(db, 'users', user.uid, 'events', editingEventId), eventData);
     else await addDoc(collection(db, 'users', user.uid, 'events'), eventData);
     resetForm();
@@ -131,7 +136,12 @@ export default function FullCalendar() {
     if (user && editingEventId) { await deleteDoc(doc(db, 'users', user.uid, 'events', editingEventId)); resetForm(); }
   };
 
-  const resetForm = () => { setEventTitle(''); setEditingEventId(null); setShowAddModal(false); };
+  const resetForm = () => { 
+    setEventTitle(''); 
+    setEventLocation(''); 
+    setEditingEventId(null); 
+    setShowAddModal(false); 
+  };
 
   const isEventOnDay = (event: any, dateString: string) => {
     const dStart = new Date(dateString + 'T00:00:00');
@@ -164,7 +174,7 @@ export default function FullCalendar() {
       />
       
       <CalendarList 
-        key={`${themeColor}-${lightMode}`} // Re-render when theme changes
+        key={`${themeColor}-${lightMode}`}
         theme={dynamicTheme} horizontal pagingEnabled calendarWidth={SCREEN_WIDTH}
         dayComponent={({date, state}: any) => {
           const dayEvents = allEvents.filter(e => isEventOnDay(e, date.dateString)).slice(0, 3);
@@ -184,7 +194,7 @@ export default function FullCalendar() {
         )}
       />
 
-      <Pressable style={[styles.fab, { backgroundColor: themeColor }]} onPress={() => { setEditingEventId(null); setEventTitle(''); setEventColor(themeColor); setStartTime(new Date()); setEndTime(new Date(Date.now()+3600000)); setShowAddModal(true); }}>
+      <Pressable style={[styles.fab, { backgroundColor: themeColor }]} onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(''); setEventColor(themeColor); setStartTime(new Date()); setEndTime(new Date(Date.now()+3600000)); setShowAddModal(true); }}>
         <Ionicons name="add" size={32} color="white" />
       </Pressable>
 
@@ -193,7 +203,7 @@ export default function FullCalendar() {
           <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.timelineHeader}>
             <View><Text style={[styles.dateLabel, { color: dynamicColor }]}>{selectedDate}</Text><Text style={[styles.dateSubLabel, { color: themeColor }]}>Schedule</Text></View>
-            <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setShowAddModal(true); }}><Ionicons name="add-circle" size={40} color={themeColor} /></Pressable>
+            <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(''); setShowAddModal(true); }}><Ionicons name="add-circle" size={40} color={themeColor} /></Pressable>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 20, paddingBottom:50 }}>
             <View style={{ height: HOUR_HEIGHT * 24 }}>
@@ -217,10 +227,13 @@ export default function FullCalendar() {
                 const leftOff = 60 + (overlaps.findIndex(o => o.id === event.id)*itemW);
                 const c = event.color || themeColor;
                 return (
-                  <Pressable key={event.id} onPress={() => { setEditingEventId(event.id); setEventTitle(event.title); setEventColor(c); setStartTime(eS); setEndTime(eE); setShowAddModal(true); }}
+                  <Pressable key={event.id} onPress={() => { setEditingEventId(event.id); setEventTitle(event.title); setEventLocation(event.location || ''); setEventColor(c); setStartTime(eS); setEndTime(eE); setShowAddModal(true); }}
                     style={[styles.absoluteEvent, { top: (sM/60)*HOUR_HEIGHT, height: (Math.max(eM-sM,30)/60)*HOUR_HEIGHT, left: leftOff, width: itemW-4, borderLeftColor: c, backgroundColor: c+'3A' }]}>
                     <Text style={[styles.eventTitleSmall, { color: dynamicColor }]} numberOfLines={1}>{event.title}</Text>
-                    <Text style={[styles.eventTimeSmall, { color: c }]}>{eS < dS ? "Cont." : formatTime(eS)}</Text>
+                    {event.location ? <Text style={[styles.eventLocSmall, { color: c }]} numberOfLines={1}><Ionicons name="location" size={8} /> {event.location}</Text> : null}
+                    <Text style={[styles.eventTimeSmall, { color: c }]}>
+  {eS < dS ? "Cont." : formatTime(eS)} - {eE > dE ? "Cont." : formatTime(eE)}
+</Text>
                   </Pressable>
                 );
               })}
@@ -234,6 +247,9 @@ export default function FullCalendar() {
         <View style={styles.overlay}><View style={[styles.modalContent, { backgroundColor: lightMode ? '#fff' : '#222', borderColor: lightMode ? '#eee' : '#333' }]}>
           <Text style={[styles.modalHeading, { color: dynamicColor }]}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
           <TextInput style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', color: dynamicColor }]} placeholder="Title" placeholderTextColor="#888" value={eventTitle} onChangeText={setEventTitle} />
+          
+          <TextInput style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', color: dynamicColor, marginBottom: 20 }]} placeholder="Location" placeholderTextColor="#888" value={eventLocation} onChangeText={setEventLocation} />
+
           <View style={styles.row}>
             <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowStartPicker(true);}}><Text style={styles.btnLabel}>Starts</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{startTime.toLocaleDateString()+'\n'+formatTime(startTime)}</Text></Pressable>
             <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowEndPicker(true);}}><Text style={styles.btnLabel}>Ends</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{endTime.toLocaleDateString()+'\n'+formatTime(endTime)}</Text></Pressable>
@@ -281,12 +297,13 @@ const styles = StyleSheet.create({
   gridLine: { flex: 1, height: 1 },
   absoluteEvent: { position: 'absolute', borderLeftWidth: 3, borderRadius: 6, padding: 8, overflow: 'hidden' },
   eventTitleSmall: { fontSize: 11, fontWeight: 'bold' },
+  eventLocSmall: { fontSize: 8, marginTop: 1, fontWeight: '600' }, // Added Location Style
   eventTimeSmall: { fontSize: 9, marginTop: 2 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
   modalContent: { borderRadius: 25, padding: 25, borderWidth: 1 },
   modalHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   subHeading: { color: '#666', fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
-  input: { padding: 15, borderRadius: 12, marginBottom: 20 },
+  input: { padding: 15, borderRadius: 12, marginBottom: 10 }, // Adjusted margin
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   timeBtn: { padding: 10, borderRadius: 12, width: '48%', alignItems: 'center' },
   btnLabel: { color: '#888', fontSize: 10 },
