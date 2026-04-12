@@ -42,7 +42,6 @@ export default function PrioritiesScreen() {
   const rankingRef = collection(db, 'users', user?.uid || 'guest', 'ranking');
   const interestsDocRef = doc(db, 'users', user?.uid || 'guest', 'data', 'interests');
 
-  // 1. Data Loading & View Routing
   useEffect(() => {
     if (!user) return;
 
@@ -59,8 +58,8 @@ export default function PrioritiesScreen() {
       if (fetchedItems.length > 0) {
         setViewMode('list');
       } else if (storedInterests.length > 0) {
-        // Auto-run AI if interests exist but list is empty
         if (!suggestion && !isGenerating) {
+          console.log("Triggering auto-generate for:", storedInterests);
           autoGenerate(storedInterests);
         }
         setViewMode('list');
@@ -73,27 +72,27 @@ export default function PrioritiesScreen() {
     return unsubRanking;
   }, [user]);
 
-  // 2. AI Logic
+  // 2. Improved AI Logic with Debugging
   const autoGenerate = async (list: string[]) => {
-    if (isGenerating || suggestion) return;
+    if (isGenerating || suggestion) return; // Prevent double-firing
     setIsGenerating(true);
     try {
-      const prompt = `The user is interested in: ${list.join(', ')}. Suggest ONE actionable, short life priority. Return ONLY the text. Example: "Go for a 10 minute walk". No punctuation.`;
+      const prompt = `The user is interested in: ${list.join(', ')}. Suggest ONE actionable, short life priority. Return ONLY the text. Example: "Go for a 10 minute walk".`;
       
       const result = await model.generateContent(prompt);
       const responseText = result.response.text().trim();
       
-      console.log("Gemini Success:", responseText);
+      console.log("Gemini Response:", responseText); // DEBUG LOG
       setSuggestion(responseText);
     } catch (e: any) {
       console.error("Gemini API Error:", e);
-      Alert.alert("AI Error", `Status: ${e.status || 'Unknown'}`);
+      // If this alerts "404", then the model name in getGenerativeModel is definitely the issue
+      Alert.alert("AI Error", `Status: ${e.status || 'Unknown'}. Message: ${e.message}`);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // 3. Interest Management
   const saveInterests = async (newList: string[]) => {
     try {
       await setDoc(interestsDocRef, { list: newList });
@@ -128,7 +127,6 @@ export default function PrioritiesScreen() {
     setSuggestion(null);
   };
 
-  // 4. Manual Priority Management
   const addItem = async () => {
     if (newItemText.trim() === '') return;
     await addDoc(rankingRef, { text: newItemText, index: items.length });
@@ -155,8 +153,6 @@ export default function PrioritiesScreen() {
     </ScaleDecorator>
   );
 
-  // --- RENDERING ---
-
   if (loading || viewMode === 'loading') {
     return (
       <View style={styles.container}>
@@ -166,12 +162,13 @@ export default function PrioritiesScreen() {
     );
   }
 
+  // --- WELCOME VIEW ---
   if (viewMode === 'welcome') {
     return (
       <View style={styles.container}>
         <LinearGradient colors={['#000000', '#1a0f05', '#2a1a0a']} style={StyleSheet.absoluteFill} />
         <View style={styles.centeredHeader}><Text style={styles.headerTitle}>Welcome</Text></View>
-        <Text style={styles.descriptionText}>What are some of your interests? Our AI will suggest your first priorities.</Text>
+        <Text style={styles.descriptionText}>What are some of your interests? The AI assistant can help kickstart some ideas about priorities.</Text>
 
         <View style={styles.inputContainer}>
           <TextInput 
@@ -207,6 +204,7 @@ export default function PrioritiesScreen() {
     );
   }
 
+  // --- MAIN LIST VIEW ---
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
@@ -231,8 +229,8 @@ export default function PrioritiesScreen() {
 
         <View style={styles.descriptionContainer}>
           <Text style={styles.descriptionText}>
-            How do you want to spend your free time? Enter a Priority of yours above and hit the + sign to add it to your list. 
-            Arrange them in order of what is most important to you and your AI assistant will help you find time for the things you value in life.
+            How do you want to spend your free time? Enter a Priority above and hit the + sign to add it to your list. 
+            Arrange them in order of importance and your AI assistant will help you find time for the things you value.
           </Text>
         </View>
 
