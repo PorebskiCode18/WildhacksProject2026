@@ -20,8 +20,8 @@ export interface CalendarEvent {
 
 export interface PriorityItem {
   id: string;
-  title: string;
-  rank: number;
+  text: string;
+  index: number;
   location: LocationData;
 }
 
@@ -77,7 +77,7 @@ export const generateScheduleSuggestions = async (
   const historySnap = await getDocs(historyQuery);
   const activityCounts: Record<string, number> = {};
   
-  priorities.forEach(p => activityCounts[p.title] = 0);
+  priorities.forEach(p => activityCounts[p.text] = 0);
   
   historySnap.forEach(doc => {
     const data = doc.data();
@@ -85,11 +85,33 @@ export const generateScheduleSuggestions = async (
       activityCounts[data.title]++;
     }
   });
+// --- DEBUG LOGGING ---
+console.log("!!! [DEBUG] RAW PRIORITIES ARRAY:", priorities); // Log the raw object first
 
-  // --- Step 4: Updated AI Prompt with Timing Logic ---
+if (priorities && priorities.length > 0) {
+  priorities.forEach((p, i) => {
+    console.log(`Priority ${i}:`, Object.keys(p)); // This tells us what keys actually exist
+  });
+
+  console.log("!!! [DEBUG] MAPPED DATA:", JSON.stringify(
+    priorities.map(p => ({ 
+      id: p.id || 'MISSING ID', 
+      title: p.text || 'MISSING TITLE', 
+      rank: p.index !== undefined ? p.index : 'MISSING RANK',
+      address: p.location?.address || 'MISSING ADDRESS' 
+    })), 
+    null, 
+    2
+  ));
+} else {
+  console.warn("!!! [DEBUG] Priorities array is NULL or LENGTH 0");
+}
+
+
+  // --- Step 4: Refined AI Prompt for Maximum Efficiency ---
   console.log("Step 4: Prompting Gemini...");
   const prompt = `
-    You are an intelligent scheduling AI. Your goal is to fill free time gaps with activities from the Priorities list.
+    You are a high-productivity assistant. Your goal is to FILL the user's free time gaps with as many activities from their Priorities list as realistically possible.
     
     Today's Date: ${targetDate.toDateString()}
     
@@ -97,21 +119,29 @@ export const generateScheduleSuggestions = async (
     ${JSON.stringify(formattedGaps, null, 2)}
     
     2. USER PRIORITIES:
-    ${JSON.stringify(priorities.map(p => ({ id: p.id, title: p.title, rank: p.rank, location: p.location.address })), null, 2)}
+    ${JSON.stringify(priorities.map(p => ({ id: p.id, title: p.text, rank: p.index, location: p.location.address })), null, 2)}
     
     3. RECENT HISTORY:
     ${JSON.stringify(activityCounts, null, 2)}
     
     CRITICAL INSTRUCTIONS:
-    - You MUST assign a specific "startTime" and "endTime" for each suggestion.
-    - These times MUST fall strictly within the boundaries of the gap provided (gapStartISO to gapEndISO).
-    - NO OVERLAPS: If you suggest multiple activities for one gap, ensure the second activity starts after the first one ends.
-    - TRAVEL BUFFER: Leave at least 10-15 minutes between activities for transition/travel.
-    - DURATION: Base the length of the suggestion on the activity type (e.g., "Gym" = 60m, "Meditate" = 15m).
+    - NEVER EVER USE OR SAY THE ID
+    - NEVER EVER USE LOCATION FOR EVENT TITLE
+    - USE GIVEN PRIORITY TITLES IN SUGGESTIONS
+    - DON'T REPEAT PRIORITIES: Each priority can only be suggested once per day.
+    - BASE TIME FRAME OF SUGGESTION BASED ON ACTIVITY: DONT JUST FILL THE GAP< FIT THE ACTIVITY
+    - DONT JUST PLACE THE PRIORITIES IN ORDER UNLESS IT MAKES SENSE TO DO SO. BE FLEXIBLE AND CREATIVE WITH THE SUGGESTIONS.
+    - SUGGEST UNIQUE ACTIVITIES OUTSIDE OF PRIORITIES IF THEY FIT PERFECTLY IN A GAP (e.g., "Quick Walk", "Coffee Break") but only if they don't have a perfect priority match.
+    - SUGGEST ACTIVITIES BASED ON HISTORY IF PRIORITIES ALL USED
+    - MAXIMIZE GAPS: If a gap is 2+ hours long, you MUST suggest multiple activities (e.g., 2-4 items) rather than just one.
+    - DENSITY: Do not leave large chunks of free time empty unless the user's priority list is exhausted.
+    - TRANSPORTATION BUFFER: Leave EXACTLY 15-20 minutes of empty space between every activity (including existing events) to account for travel and rest.
+    - LOGIC: Ensure the "startTime" and "endTime" are realistic. 
+    - NO OVERLAPS: Ensure the end of one suggestion and the start of the next (plus the buffer) do not collide.
     - Use ISO 8601 format for startTime and endTime.
 
     OUTPUT FORMAT:
-    Return a raw JSON array. Just the raw JSON, no markdown.
+    Return a raw JSON array.
     [
       {
         "gapIndex": 0,
@@ -119,7 +149,7 @@ export const generateScheduleSuggestions = async (
         "suggestedPriorityTitle": "Title",
         "startTime": "2026-04-12T14:00:00.000Z",
         "endTime": "2026-04-12T14:45:00.000Z",
-        "reasoning": "A short explanation."
+        "reasoning": "Explain why this fits here (e.g., 'Fits perfectly after your morning meeting with a 20m travel buffer')."
       }
     ]
   `;
@@ -134,10 +164,14 @@ export const generateScheduleSuggestions = async (
     
     const suggestedSchedule = JSON.parse(responseText);
     
+    // Safety check: Ensure suggestedSchedule is an array
+    if (!Array.isArray(suggestedSchedule)) {
+        throw new Error("AI did not return an array");
+    }
+
     return suggestedSchedule.map((suggestion: any, index: number) => ({
       ...suggestion,
-      tempId: `sug-${suggestion.gapIndex}-${index}`,
-      // We overwrite the gap boundaries with the AI's specific calculated times
+      tempId: `sug-${suggestion.gapIndex}-${index}-${Date.now()}`, // Added timestamp for extra uniqueness
       gapStart: new Date(suggestion.startTime), 
       gapEnd: new Date(suggestion.endTime),
     }));
@@ -146,6 +180,7 @@ export const generateScheduleSuggestions = async (
     console.error("AI Generation or Parsing Failed:", error);
     return null;
   }
+ 
 };
 
 // --- HELPER FUNCTIONS ---
