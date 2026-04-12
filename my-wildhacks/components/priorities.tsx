@@ -1,4 +1,4 @@
-/*import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, Pressable, TextInput, 
   ActivityIndicator, Alert, Modal, Platform 
@@ -364,4 +364,4 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#ff9d33', padding: 15, borderRadius: 12, alignItems: 'center', marginTop: 15 },
   mapSearchInput: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 10 },
   mapSearchList: { backgroundColor: '#fff', borderRadius: 8, marginTop: 5 },
-});*/
+});

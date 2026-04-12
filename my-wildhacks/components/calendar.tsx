@@ -21,12 +21,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+// Map Imports
+import MapView, { Marker } from 'react-native-maps';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_OPEN_Y = SCREEN_HEIGHT * 0.1; 
 const DRAWER_CLOSED_Y = SCREEN_HEIGHT;
 const HOUR_HEIGHT = 80;
 
 const COLOR_PRESETS = ['#ff8c00', '#ff4444', '#00d4ff', '#ccff00', '#ff00ff', '#ffffff', '#8e44ad'];
+
+interface LocationData {
+  address: string;
+  lat: number;
+  lng: number;
+}
 
 export default function FullCalendar() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -48,13 +58,23 @@ export default function FullCalendar() {
   // Form State
   const [showAddModal, setShowAddModal] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
-  const [eventLocation, setEventLocation] = useState(''); // New State
+  const [eventLocation, setEventLocation] = useState<LocationData | null>(null); // Replaced String with Object
   const [eventColor, setEventColor] = useState('#ff8c00');
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date());
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+
+  // Maps & Location State
+  const [isLocationModalVisible, setLocationModalVisible] = useState(false);
+  const [tempLocation, setTempLocation] = useState<LocationData | null>(null);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 37.78825,
+    longitude: -122.4324,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  });
 
   const translateY = useRef(new Animated.Value(DRAWER_CLOSED_Y)).current;
 
@@ -121,7 +141,7 @@ export default function FullCalendar() {
     if (!user) return;
     const eventData = { 
       title: eventTitle, 
-      location: eventLocation, // Save Location
+      location: eventLocation, // Now an object
       start: Timestamp.fromDate(startTime), 
       end: Timestamp.fromDate(endTime), 
       color: eventColor 
@@ -138,7 +158,7 @@ export default function FullCalendar() {
 
   const resetForm = () => { 
     setEventTitle(''); 
-    setEventLocation(''); 
+    setEventLocation(null); 
     setEditingEventId(null); 
     setShowAddModal(false); 
   };
@@ -163,6 +183,24 @@ export default function FullCalendar() {
       setEndTime(val);
       if (pickerMode === 'date') { setPickerMode('time'); setTimeout(() => setShowEndPicker(true), 150); }
     }
+  };
+
+  // Maps Modal Logic
+  const openLocationPicker = () => {
+    setTempLocation(eventLocation);
+    if (eventLocation) {
+      setMapRegion({
+        ...mapRegion,
+        latitude: eventLocation.lat,
+        longitude: eventLocation.lng,
+      });
+    }
+    setLocationModalVisible(true);
+  };
+
+  const confirmLocation = () => {
+    setEventLocation(tempLocation);
+    setLocationModalVisible(false);
   };
 
   return (
@@ -194,7 +232,7 @@ export default function FullCalendar() {
         )}
       />
 
-      <Pressable style={[styles.fab, { backgroundColor: themeColor }]} onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(''); setEventColor(themeColor); setStartTime(new Date()); setEndTime(new Date(Date.now()+3600000)); setShowAddModal(true); }}>
+      <Pressable style={[styles.fab, { backgroundColor: themeColor }]} onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(null); setEventColor(themeColor); setStartTime(new Date()); setEndTime(new Date(Date.now()+3600000)); setShowAddModal(true); }}>
         <Ionicons name="add" size={32} color="white" />
       </Pressable>
 
@@ -203,7 +241,7 @@ export default function FullCalendar() {
           <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.timelineHeader}>
             <View><Text style={[styles.dateLabel, { color: dynamicColor }]}>{selectedDate}</Text><Text style={[styles.dateSubLabel, { color: themeColor }]}>Schedule</Text></View>
-            <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(''); setShowAddModal(true); }}><Ionicons name="add-circle" size={40} color={themeColor} /></Pressable>
+            <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(null); setShowAddModal(true); }}><Ionicons name="add-circle" size={40} color={themeColor} /></Pressable>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 20, paddingBottom:50 }}>
             <View style={{ height: HOUR_HEIGHT * 24 }}>
@@ -227,10 +265,10 @@ export default function FullCalendar() {
                 const leftOff = 60 + (overlaps.findIndex(o => o.id === event.id)*itemW);
                 const c = event.color || themeColor;
                 return (
-                  <Pressable key={event.id} onPress={() => { setEditingEventId(event.id); setEventTitle(event.title); setEventLocation(event.location || ''); setEventColor(c); setStartTime(eS); setEndTime(eE); setShowAddModal(true); }}
+                  <Pressable key={event.id} onPress={() => { setEditingEventId(event.id); setEventTitle(event.title); setEventLocation(event.location || null); setEventColor(c); setStartTime(eS); setEndTime(eE); setShowAddModal(true); }}
                     style={[styles.absoluteEvent, { top: (sM/60)*HOUR_HEIGHT, height: (Math.max(eM-sM,30)/60)*HOUR_HEIGHT, left: leftOff, width: itemW-4, borderLeftColor: c, backgroundColor: c+'3A' }]}>
                     <Text style={[styles.eventTitleSmall, { color: dynamicColor }]} numberOfLines={1}>{event.title}</Text>
-                    {event.location ? <Text style={[styles.eventLocSmall, { color: c }]} numberOfLines={1}><Ionicons name="location" size={8} /> {event.location}</Text> : null}
+                    {event.location ? <Text style={[styles.eventLocSmall, { color: c }]} numberOfLines={1}><Ionicons name="location" size={8} /> {event.location.address}</Text> : null}
                     <Text style={[styles.eventTimeSmall, { color: c }]}>
   {eS < dS ? "Cont." : formatTime(eS)} - {eE > dE ? "Cont." : formatTime(eE)}
 </Text>
@@ -242,38 +280,110 @@ export default function FullCalendar() {
         </Animated.View>
       )}
 
-      {/* EVENT MODAL */}
+      {/* EVENT CREATION MODAL */}
       <Modal visible={showAddModal} transparent animationType="fade">
-        <View style={styles.overlay}><View style={[styles.modalContent, { backgroundColor: lightMode ? '#fff' : '#222', borderColor: lightMode ? '#eee' : '#333' }]}>
-          <Text style={[styles.modalHeading, { color: dynamicColor }]}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
-          <TextInput style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', color: dynamicColor }]} placeholder="Title" placeholderTextColor="#888" value={eventTitle} onChangeText={setEventTitle} />
-          
-          <TextInput style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', color: dynamicColor, marginBottom: 20 }]} placeholder="Location" placeholderTextColor="#888" value={eventLocation} onChangeText={setEventLocation} />
+        <View style={styles.overlay}>
+          <View style={[styles.modalContent, { backgroundColor: lightMode ? '#fff' : '#222', borderColor: lightMode ? '#eee' : '#333' }]}>
+            <Text style={[styles.modalHeading, { color: dynamicColor }]}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
+            
+            <TextInput style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', color: dynamicColor }]} placeholder="Title" placeholderTextColor="#888" value={eventTitle} onChangeText={setEventTitle} />
+            
+            {/* Map Location Trigger Button */}
+            <Pressable 
+              style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', marginBottom: 20, justifyContent: 'center' }]} 
+              onPress={openLocationPicker}
+            >
+              <Text style={{ color: eventLocation ? dynamicColor : '#888' }} numberOfLines={1}>
+                {eventLocation ? `📍 ${eventLocation.address}` : 'Add Location (Optional)'}
+              </Text>
+            </Pressable>
 
-          <View style={styles.row}>
-            <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowStartPicker(true);}}><Text style={styles.btnLabel}>Starts</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{startTime.toLocaleDateString()+'\n'+formatTime(startTime)}</Text></Pressable>
-            <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowEndPicker(true);}}><Text style={styles.btnLabel}>Ends</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{endTime.toLocaleDateString()+'\n'+formatTime(endTime)}</Text></Pressable>
-          </View>
-          <Text style={styles.subHeading}>Category Labels</Text>
-          <ScrollView style={{maxHeight: 180, marginBottom: 15}}>
-            {COLOR_PRESETS.map(c => (
-              <View key={c} style={[styles.catRow, { backgroundColor: lightMode ? '#f9f9f9' : '#1a1a1a' }]}>
-                <Pressable onPress={()=>setEventColor(c)} style={[styles.circleSmall, {backgroundColor:c, borderWidth:eventColor===c?2:0, borderColor: lightMode ? '#000' : '#fff'}]} />
-                <TextInput style={[styles.catInput, { color: dynamicColor }]} value={categoryLabels[c]} onChangeText={(t)=>{const u = {...categoryLabels, [c]:t}; setCategoryLabels(u); saveGlobalSettings(undefined, u);}} placeholder="Label..." placeholderTextColor="#444" />
-                {eventColor===c && <Ionicons name="checkmark-circle" size={18} color={c} />}
+            <View style={styles.row}>
+              <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowStartPicker(true);}}><Text style={styles.btnLabel}>Starts</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{startTime.toLocaleDateString()+'\n'+formatTime(startTime)}</Text></Pressable>
+              <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowEndPicker(true);}}><Text style={styles.btnLabel}>Ends</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{endTime.toLocaleDateString()+'\n'+formatTime(endTime)}</Text></Pressable>
+            </View>
+            <Text style={styles.subHeading}>Category Labels</Text>
+            <ScrollView style={{maxHeight: 180, marginBottom: 15}}>
+              {COLOR_PRESETS.map(c => (
+                <View key={c} style={[styles.catRow, { backgroundColor: lightMode ? '#f9f9f9' : '#1a1a1a' }]}>
+                  <Pressable onPress={()=>setEventColor(c)} style={[styles.circleSmall, {backgroundColor:c, borderWidth:eventColor===c?2:0, borderColor: lightMode ? '#000' : '#fff'}]} />
+                  <TextInput style={[styles.catInput, { color: dynamicColor }]} value={categoryLabels[c]} onChangeText={(t)=>{const u = {...categoryLabels, [c]:t}; setCategoryLabels(u); saveGlobalSettings(undefined, u);}} placeholder="Label..." placeholderTextColor="#444" />
+                  {eventColor===c && <Ionicons name="checkmark-circle" size={18} color={c} />}
+                </View>
+              ))}
+            </ScrollView>
+            { (showStartPicker || showEndPicker) && <DateTimePicker is24Hour={is24Hour} value={showStartPicker?startTime:endTime} mode={pickerMode} onChange={onPickerChange} /> }
+            <View style={styles.modalButtons}>
+              {editingEventId ? <Pressable onPress={handleDeleteEvent} style={styles.deleteBtn}><Ionicons name="trash-outline" size={24} color="#ff4444" /></Pressable> : <Pressable onPress={resetForm}><Text style={{color:'#888'}}>Cancel</Text></Pressable>}
+              <View style={{flexDirection:'row', alignItems:'center'}}>
+                {editingEventId && <Pressable onPress={resetForm} style={{marginRight:15}}><Text style={{color:'#888'}}>Cancel</Text></Pressable>}
+                <Pressable style={[styles.saveBtn, {backgroundColor: themeColor}]} onPress={handleSaveEvent}><Text style={styles.saveText}>{editingEventId?'Update':'Save'}</Text></Pressable>
               </View>
-            ))}
-          </ScrollView>
-          { (showStartPicker || showEndPicker) && <DateTimePicker is24Hour={is24Hour} value={showStartPicker?startTime:endTime} mode={pickerMode} onChange={onPickerChange} /> }
-          <View style={styles.modalButtons}>
-            {editingEventId ? <Pressable onPress={handleDeleteEvent} style={styles.deleteBtn}><Ionicons name="trash-outline" size={24} color="#ff4444" /></Pressable> : <Pressable onPress={resetForm}><Text style={{color:'#888'}}>Cancel</Text></Pressable>}
-            <View style={{flexDirection:'row', alignItems:'center'}}>
-              {editingEventId && <Pressable onPress={resetForm} style={{marginRight:15}}><Text style={{color:'#888'}}>Cancel</Text></Pressable>}
-              <Pressable style={[styles.saveBtn, {backgroundColor: themeColor}]} onPress={handleSaveEvent}><Text style={styles.saveText}>{editingEventId?'Update':'Save'}</Text></Pressable>
             </View>
           </View>
-        </View></View>
+        </View>
       </Modal>
+
+      {/* LOCATION PICKER MODAL (Rendered as a sibling to avoid nested Modal issues on iOS) */}
+      <Modal visible={isLocationModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.mapModalOverlay}>
+          <View style={styles.mapModalContent}>
+            <View style={styles.mapModalHeader}>
+              <Text style={styles.modalHeading}>Set Location</Text>
+              <Pressable onPress={() => setLocationModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#fff" />
+              </Pressable>
+            </View>
+
+            <View style={{ flex: 1, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+              <MapView style={StyleSheet.absoluteFill} region={mapRegion}>
+                {tempLocation && (
+                  <Marker coordinate={{ latitude: tempLocation.lat, longitude: tempLocation.lng }} />
+                )}
+              </MapView>
+
+              <View style={{ position: 'absolute', width: '100%', top: 10, paddingHorizontal: 10, zIndex: 1 }}>
+                <GooglePlacesAutocomplete
+                  placeholder="Search for an address..."
+                  fetchDetails={true}
+                  onPress={(data, details = null) => {
+                    if (details) {
+                      const loc = {
+                        address: data.description,
+                        lat: details.geometry.location.lat,
+                        lng: details.geometry.location.lng,
+                      };
+                      setTempLocation(loc);
+                      setMapRegion({
+                        ...mapRegion,
+                        latitude: loc.lat,
+                        longitude: loc.lng,
+                      });
+                    }
+                  }}
+                  query={{
+                    key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+                    language: 'en',
+                  }}
+                  styles={{
+                    textInput: styles.mapSearchInput,
+                    listView: styles.mapSearchList,
+                  }}
+                />
+              </View>
+            </View>
+
+            <Pressable 
+              style={[styles.saveBtn, { opacity: tempLocation ? 1 : 0.5, marginTop: 15, alignItems: 'center' }]} 
+              onPress={confirmLocation} 
+              disabled={!tempLocation}
+            >
+              <Text style={styles.saveText}>Save Location</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -297,13 +407,13 @@ const styles = StyleSheet.create({
   gridLine: { flex: 1, height: 1 },
   absoluteEvent: { position: 'absolute', borderLeftWidth: 3, borderRadius: 6, padding: 8, overflow: 'hidden' },
   eventTitleSmall: { fontSize: 11, fontWeight: 'bold' },
-  eventLocSmall: { fontSize: 8, marginTop: 1, fontWeight: '600' }, // Added Location Style
+  eventLocSmall: { fontSize: 8, marginTop: 1, fontWeight: '600' }, 
   eventTimeSmall: { fontSize: 9, marginTop: 2 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
   modalContent: { borderRadius: 25, padding: 25, borderWidth: 1 },
-  modalHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  modalHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#fff' },
   subHeading: { color: '#666', fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
-  input: { padding: 15, borderRadius: 12, marginBottom: 10 }, // Adjusted margin
+  input: { padding: 15, borderRadius: 12, marginBottom: 10, minHeight: 50 }, 
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   timeBtn: { padding: 10, borderRadius: 12, width: '48%', alignItems: 'center' },
   btnLabel: { color: '#888', fontSize: 10 },
@@ -314,5 +424,12 @@ const styles = StyleSheet.create({
   deleteBtn: { padding: 10, borderRadius: 12, backgroundColor: 'rgba(255, 68, 68, 0.1)' },
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 8, borderRadius: 10 },
   circleSmall: { width: 24, height: 24, borderRadius: 12, marginRight: 12 },
-  catInput: { flex: 1, fontSize: 13, fontWeight: '600' }
+  catInput: { flex: 1, fontSize: 13, fontWeight: '600' },
+  
+  // Location Modal Styles
+  mapModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+  mapModalContent: { height: '80%', backgroundColor: '#1a0f05', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 },
+  mapModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  mapSearchInput: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 10 },
+  mapSearchList: { backgroundColor: '#fff', borderRadius: 8, marginTop: 5 },
 });
