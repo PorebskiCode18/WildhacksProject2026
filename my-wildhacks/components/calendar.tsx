@@ -34,13 +34,17 @@ export default function FullCalendar() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   
-  // Customization & Category States
+  // Customization & Global States
   const [themeColor, setThemeColor] = useState('#ff8c00');
-  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [is24Hour, setIs24Hour] = useState(false); 
+  const [lightMode, setLightMode] = useState(false); // Updated: Background Logic
   const [categoryLabels, setCategoryLabels] = useState<any>({
     '#ff8c00': 'General', '#ff4444': 'Urgent', '#00d4ff': 'Social', 
     '#ccff00': 'Health', '#ff00ff': 'Personal', '#ffffff': 'Other', '#8e44ad': 'Work'
   });
+
+  // Dynamic Content Color
+  const dynamicColor = lightMode ? '#000000' : '#FFFFFF';
 
   // Form State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -58,13 +62,13 @@ export default function FullCalendar() {
   const dynamicTheme = useMemo(() => ({
     calendarBackground: 'transparent',
     textSectionTitleColor: themeColor,
-    dayTextColor: '#fff',
+    dayTextColor: dynamicColor, // Adjusts based on Light/Dark
     monthTextColor: themeColor,
     textMonthFontWeight: '700' as const,
     textMonthFontSize: 22,
     todayTextColor: themeColor,
     arrowColor: themeColor,
-  }), [themeColor]);
+  }), [themeColor, lightMode]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -84,26 +88,23 @@ export default function FullCalendar() {
     const user = auth.currentUser;
     if (!user) return;
     
-    // Fetch Events
-    const q = query(collection(db, 'users', user.uid, 'events'), orderBy('start', 'asc'));
-    const unsubEvents = onSnapshot(q, (snapshot) => {
+    const unsubEvents = onSnapshot(query(collection(db, 'users', user.uid, 'events'), orderBy('start', 'asc')), (snapshot) => {
       const fetched: any[] = [];
       snapshot.forEach((doc) => fetched.push({ id: doc.id, ...doc.data() }));
       setAllEvents(fetched);
     });
 
-    // Fetch Persistent Settings (Theme + Labels)
-    const loadSettings = async () => {
-      const docSnap = await getDoc(doc(db, 'users', user.uid, 'settings', 'eventConfig'));
+    const unsubSettings = onSnapshot(doc(db, 'users', user.uid, 'settings', 'eventConfig'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.labels) setCategoryLabels(data.labels);
         if (data.themeColor) setThemeColor(data.themeColor);
+        if (data.is24Hour !== undefined) setIs24Hour(data.is24Hour);
+        if (data.lightMode !== undefined) setLightMode(data.lightMode); // Corrected listener
       }
-    };
-    loadSettings();
+    });
 
-    return () => unsubEvents();
+    return () => { unsubEvents(); unsubSettings(); };
   }, []);
 
   const saveGlobalSettings = async (newTheme?: string, newLabels?: any) => {
@@ -138,7 +139,9 @@ export default function FullCalendar() {
     return event.start.toDate() <= dEnd && event.end.toDate() >= dStart;
   };
 
-  const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !is24Hour });
+  };
 
   const onPickerChange = (event: any, val?: Date) => {
     setShowStartPicker(false); setShowEndPicker(false);
@@ -154,15 +157,20 @@ export default function FullCalendar() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#000000', '#1a0f0a']} style={StyleSheet.absoluteFill} />
+      <LinearGradient 
+        colors={lightMode ? ['#FFFFFF', '#FFFFFF', themeColor] : ['#000000', '#000000', themeColor + '15', themeColor + '40']} 
+        locations={[0, 0.15, 0.8, 1]}
+        style={StyleSheet.absoluteFill} 
+      />
       
       <CalendarList 
-        key={themeColor} theme={dynamicTheme} horizontal pagingEnabled calendarWidth={SCREEN_WIDTH}
+        key={`${themeColor}-${lightMode}`} // Re-render when theme changes
+        theme={dynamicTheme} horizontal pagingEnabled calendarWidth={SCREEN_WIDTH}
         dayComponent={({date, state}: any) => {
           const dayEvents = allEvents.filter(e => isEventOnDay(e, date.dateString)).slice(0, 3);
           return (
-            <Pressable style={[styles.dayBox, state==='today' && {borderColor: themeColor}]} onPress={()=>{setSelectedDate(date.dateString); openDrawer();}}>
-              <Text style={[styles.dayText, state==='disabled' && {color: '#444'}]}>{date.day}</Text>
+            <Pressable style={[styles.dayBox, { borderColor: lightMode ? 'rgba(0,0,0,0.05)' : '#221a15' }, state==='today' && {borderColor: themeColor}]} onPress={()=>{setSelectedDate(date.dateString); openDrawer();}}>
+              <Text style={[styles.dayText, { color: dynamicColor }, state==='disabled' && {color: lightMode ? '#ccc' : '#444'}]}>{date.day}</Text>
               <View style={styles.miniEventContainer}>
                 {dayEvents.map((e, i) => <Text key={i} style={[styles.miniEventText, {color: e.color || themeColor}]} numberOfLines={1}>• {e.title}</Text>)}
               </View>
@@ -170,9 +178,9 @@ export default function FullCalendar() {
           );
         }}
         renderHeader={(date) => (
-          <Pressable onPress={() => setShowColorPicker(true)}>
+          <View>
             <Text style={[styles.monthHeader, { color: themeColor }]}>{date.toString('MMMM yyyy')}</Text>
-          </Pressable>
+          </View>
         )}
       />
 
@@ -181,16 +189,23 @@ export default function FullCalendar() {
       </Pressable>
 
       {isDrawerOpen && (
-        <Animated.View style={[styles.drawerContent, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+        <Animated.View style={[styles.drawerContent, { backgroundColor: lightMode ? '#f5f5f5' : '#161616', transform: [{ translateY }] }]} {...panResponder.panHandlers}>
           <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.timelineHeader}>
-            <View><Text style={styles.dateLabel}>{selectedDate}</Text><Text style={[styles.dateSubLabel, { color: themeColor }]}>Schedule</Text></View>
+            <View><Text style={[styles.dateLabel, { color: dynamicColor }]}>{selectedDate}</Text><Text style={[styles.dateSubLabel, { color: themeColor }]}>Schedule</Text></View>
             <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setShowAddModal(true); }}><Ionicons name="add-circle" size={40} color={themeColor} /></Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 20, paddingBottom:50 }}>
             <View style={{ height: HOUR_HEIGHT * 24 }}>
               {Array.from({length: 24}).map((_, h) => (
-                <View key={h} style={[styles.hourRow, { height: HOUR_HEIGHT }]}><Text style={styles.hourText}>{h === 0 ? '12 AM' : h > 12 ? `${h-12} PM` : `${h} ${h===12?'PM':'AM'}`}</Text><View style={styles.gridLine} /></View>
+                <View key={h} style={[styles.hourRow, { height: HOUR_HEIGHT }]}>
+                  <Text style={[styles.hourText, { color: lightMode ? '#999' : '#444' }]}>
+                    {is24Hour 
+                      ? `${h.toString().padStart(2, '0')}:00` 
+                      : (h === 0 ? '12 AM' : h > 12 ? `${h-12} PM` : `${h} ${h===12?'PM':'AM'}`)}
+                  </Text>
+                  <View style={[styles.gridLine, { backgroundColor: lightMode ? '#ddd' : '#222' }]} />
+                </View>
               ))}
               {allEvents.filter(e => isEventOnDay(e, selectedDate)).map((event, i, arr) => {
                 const eS = event.start.toDate(); const eE = event.end.toDate();
@@ -204,7 +219,7 @@ export default function FullCalendar() {
                 return (
                   <Pressable key={event.id} onPress={() => { setEditingEventId(event.id); setEventTitle(event.title); setEventColor(c); setStartTime(eS); setEndTime(eE); setShowAddModal(true); }}
                     style={[styles.absoluteEvent, { top: (sM/60)*HOUR_HEIGHT, height: (Math.max(eM-sM,30)/60)*HOUR_HEIGHT, left: leftOff, width: itemW-4, borderLeftColor: c, backgroundColor: c+'3A' }]}>
-                    <Text style={styles.eventTitleSmall} numberOfLines={1}>{event.title}</Text>
+                    <Text style={[styles.eventTitleSmall, { color: dynamicColor }]} numberOfLines={1}>{event.title}</Text>
                     <Text style={[styles.eventTimeSmall, { color: c }]}>{eS < dS ? "Cont." : formatTime(eS)}</Text>
                   </Pressable>
                 );
@@ -214,35 +229,26 @@ export default function FullCalendar() {
         </Animated.View>
       )}
 
-      {/* THEME PICKER MODAL */}
-      <Modal visible={showColorPicker} transparent animationType="fade">
-        <View style={styles.overlay}><View style={styles.modalContent}>
-          <Text style={styles.modalHeading}>Accent Color</Text>
-          <View style={styles.grid}>{COLOR_PRESETS.map(c => <Pressable key={c} onPress={()=>{setThemeColor(c); saveGlobalSettings(c); setShowColorPicker(false);}} style={[styles.circle, {backgroundColor:c, borderWidth:themeColor===c?3:0, borderColor:'#fff'}]} />)}</View>
-          <Pressable onPress={()=>setShowColorPicker(false)} style={{marginTop:20}}><Text style={{color:'#888', textAlign:'center'}}>Cancel</Text></Pressable>
-        </View></View>
-      </Modal>
-
       {/* EVENT MODAL */}
       <Modal visible={showAddModal} transparent animationType="fade">
-        <View style={styles.overlay}><View style={styles.modalContent}>
-          <Text style={styles.modalHeading}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
-          <TextInput style={styles.input} placeholder="Title" placeholderTextColor="#888" value={eventTitle} onChangeText={setEventTitle} />
+        <View style={styles.overlay}><View style={[styles.modalContent, { backgroundColor: lightMode ? '#fff' : '#222', borderColor: lightMode ? '#eee' : '#333' }]}>
+          <Text style={[styles.modalHeading, { color: dynamicColor }]}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
+          <TextInput style={[styles.input, { backgroundColor: lightMode ? '#f5f5f5' : '#111', color: dynamicColor }]} placeholder="Title" placeholderTextColor="#888" value={eventTitle} onChangeText={setEventTitle} />
           <View style={styles.row}>
-            <Pressable style={styles.timeBtn} onPress={()=>{setPickerMode('date'); setShowStartPicker(true);}}><Text style={styles.btnLabel}>Starts</Text><Text style={styles.btnVal}>{startTime.toLocaleDateString()+'\n'+formatTime(startTime)}</Text></Pressable>
-            <Pressable style={styles.timeBtn} onPress={()=>{setPickerMode('date'); setShowEndPicker(true);}}><Text style={styles.btnLabel}>Ends</Text><Text style={styles.btnVal}>{endTime.toLocaleDateString()+'\n'+formatTime(endTime)}</Text></Pressable>
+            <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowStartPicker(true);}}><Text style={styles.btnLabel}>Starts</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{startTime.toLocaleDateString()+'\n'+formatTime(startTime)}</Text></Pressable>
+            <Pressable style={[styles.timeBtn, { backgroundColor: lightMode ? '#eee' : '#333' }]} onPress={()=>{setPickerMode('date'); setShowEndPicker(true);}}><Text style={styles.btnLabel}>Ends</Text><Text style={[styles.btnVal, { color: dynamicColor }]}>{endTime.toLocaleDateString()+'\n'+formatTime(endTime)}</Text></Pressable>
           </View>
           <Text style={styles.subHeading}>Category Labels</Text>
           <ScrollView style={{maxHeight: 180, marginBottom: 15}}>
             {COLOR_PRESETS.map(c => (
-              <View key={c} style={styles.catRow}>
-                <Pressable onPress={()=>setEventColor(c)} style={[styles.circleSmall, {backgroundColor:c, borderWidth:eventColor===c?2:0, borderColor:'#fff'}]} />
-                <TextInput style={styles.catInput} value={categoryLabels[c]} onChangeText={(t)=>{const u = {...categoryLabels, [c]:t}; setCategoryLabels(u); saveGlobalSettings(undefined, u);}} placeholder="Label..." placeholderTextColor="#444" />
+              <View key={c} style={[styles.catRow, { backgroundColor: lightMode ? '#f9f9f9' : '#1a1a1a' }]}>
+                <Pressable onPress={()=>setEventColor(c)} style={[styles.circleSmall, {backgroundColor:c, borderWidth:eventColor===c?2:0, borderColor: lightMode ? '#000' : '#fff'}]} />
+                <TextInput style={[styles.catInput, { color: dynamicColor }]} value={categoryLabels[c]} onChangeText={(t)=>{const u = {...categoryLabels, [c]:t}; setCategoryLabels(u); saveGlobalSettings(undefined, u);}} placeholder="Label..." placeholderTextColor="#444" />
                 {eventColor===c && <Ionicons name="checkmark-circle" size={18} color={c} />}
               </View>
             ))}
           </ScrollView>
-          { (showStartPicker || showEndPicker) && <DateTimePicker value={showStartPicker?startTime:endTime} mode={pickerMode} onChange={onPickerChange} /> }
+          { (showStartPicker || showEndPicker) && <DateTimePicker is24Hour={is24Hour} value={showStartPicker?startTime:endTime} mode={pickerMode} onChange={onPickerChange} /> }
           <View style={styles.modalButtons}>
             {editingEventId ? <Pressable onPress={handleDeleteEvent} style={styles.deleteBtn}><Ionicons name="trash-outline" size={24} color="#ff4444" /></Pressable> : <Pressable onPress={resetForm}><Text style={{color:'#888'}}>Cancel</Text></Pressable>}
             <View style={{flexDirection:'row', alignItems:'center'}}>
@@ -258,40 +264,38 @@ export default function FullCalendar() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000', paddingTop: 50 },
-  dayBox: { width: SCREEN_WIDTH / 7 - 1, height: 75, borderWidth: 0.5, borderColor: '#221a15', padding: 4 },
-  dayText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  dayBox: { width: SCREEN_WIDTH / 7 - 1, height: 75, borderWidth: 0.5, padding: 4 },
+  dayText: { fontSize: 10, fontWeight: '700' },
   monthHeader: { fontSize: 22, fontWeight: '700', marginVertical: 10, textAlign: 'center' },
   miniEventContainer: { marginTop: 2 },
   miniEventText: { fontSize: 7, lineHeight: 9, fontWeight: '500' },
   fab: { position: 'absolute', bottom: 15, right: 25, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8, zIndex: 99 },
-  drawerContent: { position: 'absolute', bottom: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.9, backgroundColor: '#161616', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 20 },
+  drawerContent: { position: 'absolute', bottom: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.9, borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 20 },
   dragHandleContainer: { width: '100%', alignItems: 'center', paddingBottom: 15 },
   dragHandle: { width: 45, height: 5, backgroundColor: '#333', borderRadius: 10 },
   timelineHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  dateLabel: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  dateLabel: { fontSize: 24, fontWeight: 'bold' },
   dateSubLabel: { fontSize: 13, fontWeight: '500' },
   hourRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  hourText: { color: '#444', fontSize: 10, width: 45, textAlign: 'right', paddingRight: 10, marginTop: -6 },
-  gridLine: { flex: 1, height: 1, backgroundColor: '#222' },
+  hourText: { fontSize: 10, width: 55, textAlign: 'right', paddingRight: 10, marginTop: -6 }, 
+  gridLine: { flex: 1, height: 1 },
   absoluteEvent: { position: 'absolute', borderLeftWidth: 3, borderRadius: 6, padding: 8, overflow: 'hidden' },
-  eventTitleSmall: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  eventTitleSmall: { fontSize: 11, fontWeight: 'bold' },
   eventTimeSmall: { fontSize: 9, marginTop: 2 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#222', borderRadius: 25, padding: 25, borderWidth: 1, borderColor: '#333' },
-  modalHeading: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  modalContent: { borderRadius: 25, padding: 25, borderWidth: 1 },
+  modalHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   subHeading: { color: '#666', fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
-  input: { backgroundColor: '#111', color: '#fff', padding: 15, borderRadius: 12, marginBottom: 20 },
+  input: { padding: 15, borderRadius: 12, marginBottom: 20 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  timeBtn: { backgroundColor: '#333', padding: 10, borderRadius: 12, width: '48%', alignItems: 'center' },
+  timeBtn: { padding: 10, borderRadius: 12, width: '48%', alignItems: 'center' },
   btnLabel: { color: '#888', fontSize: 10 },
-  btnVal: { color: '#fff', fontWeight: 'bold', fontSize: 10, textAlign: 'center' },
+  btnVal: { fontWeight: 'bold', fontSize: 10, textAlign: 'center' },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   saveBtn: { paddingVertical: 12, paddingHorizontal: 25, borderRadius: 12 },
   saveText: { color: '#fff', fontWeight: 'bold' },
   deleteBtn: { padding: 10, borderRadius: 12, backgroundColor: 'rgba(255, 68, 68, 0.1)' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15 },
-  circle: { width: 50, height: 50, borderRadius: 25 },
-  catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, backgroundColor: '#1a1a1a', padding: 8, borderRadius: 10 },
+  catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 8, borderRadius: 10 },
   circleSmall: { width: 24, height: 24, borderRadius: 12, marginRight: 12 },
-  catInput: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' }
+  catInput: { flex: 1, fontSize: 13, fontWeight: '600' }
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, Pressable, TextInput, 
-  ActivityIndicator, Alert 
+  ActivityIndicator, Alert, Dimensions 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,40 +15,35 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { auth, db } from '../firebaseConfig';
 import { 
   collection, query, orderBy, onSnapshot, 
-  addDoc, deleteDoc, doc, writeBatch, getDocs 
+  addDoc, deleteDoc, doc, writeBatch, setDoc
 } from 'firebase/firestore';
 
-// Define the shape of a Priority Item
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface PriorityItem {
   id: string;
   text: string;
   index: number;
 }
 
-<<<<<<< Updated upstream
-// 2. Define the Component
-const priorities = ({ title = "Priorities" }: Props) => {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.text}>{title}</Text>
-    </View>
-  );
-};
-=======
 export default function PrioritiesScreen() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<PriorityItem[]>([]);
   const [newItemText, setNewItemText] = useState('');
+  
+  // Theme States
+  const [themeColor, setThemeColor] = useState('#ff9d33'); 
+  const [lightMode, setLightMode] = useState(false); // Updated from pureBlackMode
 
   const user = auth.currentUser;
   const rankingRef = collection(db, 'users', user?.uid || 'guest', 'ranking');
 
-  // 1. Listen to Firestore for real-time updates ordered by 'index'
   useEffect(() => {
     if (!user) return;
 
+    // 1. Listen to Priorities List
     const q = query(rankingRef, orderBy('index', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubItems = onSnapshot(q, (snapshot) => {
       const fetchedItems = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -57,42 +52,53 @@ export default function PrioritiesScreen() {
       setLoading(false);
     });
 
-    return unsubscribe;
+    // 2. Listen to Global Theme Settings
+    const unsubTheme = onSnapshot(doc(db, 'users', user.uid, 'settings', 'eventConfig'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.themeColor) setThemeColor(data.themeColor);
+        if (data.lightMode !== undefined) setLightMode(data.lightMode); // Listen for lightMode
+      }
+    });
+
+    return () => {
+      unsubItems();
+      unsubTheme();
+    };
   }, [user]);
 
-  // 2. Add a new item to the bottom of the list
+  // Helper for dynamic colors
+  const dynamicColor = lightMode ? '#000000' : '#FFFFFF';
+  const cardBg = lightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)';
+  const cardBorder = lightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.08)';
+
   const addItem = async () => {
     if (newItemText.trim() === '') return;
     try {
       await addDoc(rankingRef, {
         text: newItemText,
-        index: items.length, // Put at the end
+        index: items.length,
         createdAt: new Date().toISOString(),
       });
       setNewItemText('');
     } catch (e) {
-      console.error("Error adding document: ", e);
+      console.error(e);
     }
   };
 
-  // 3. Handle the reordering after a drag
   const handleDragEnd = async (data: PriorityItem[]) => {
-    // Optimistically update local state for smoothness
     setItems(data);
-
     const batch = writeBatch(db);
     data.forEach((item, newIndex) => {
       const itemRef = doc(db, 'users', user!.uid, 'ranking', item.id);
       batch.update(itemRef, { index: newIndex });
     });
-
     try {
       await batch.commit();
     } catch (e) {
-      Alert.alert("Error", "Failed to sync new order to database.");
+      Alert.alert("Error", "Failed to sync order.");
     }
   };
-
 
   const renderItem = ({ item, drag, isActive, getIndex }: RenderItemParams<PriorityItem>) => {
     const currentPosition = (getIndex() ?? 0) + 1;
@@ -102,35 +108,32 @@ export default function PrioritiesScreen() {
         <Pressable
           onLongPress={drag} 
           disabled={isActive}
-          delayLongPress={200} // Makes it feel more responsive
+          delayLongPress={200}
           style={[
             styles.itemRow,
             { 
-              backgroundColor: isActive ? 'rgba(255, 157, 51, 0.4)' : 'rgba(255, 255, 255, 0.05)',
-              borderColor: isActive ? '#ff9d33' : 'rgba(255, 255, 255, 0.1)',
-              // Adding a slight shadow when active to help the "pop" effect
-              elevation: isActive ? 5 : 0,
+              backgroundColor: isActive ? `${themeColor}44` : cardBg,
+              borderColor: isActive ? themeColor : cardBorder,
+              elevation: isActive ? 10 : 0,
             }
           ]}
         >
           <View style={styles.numberBadge}>
-            <Text style={styles.numberText}>{currentPosition}.</Text>
+            <Text style={[styles.numberText, { color: themeColor }]}>{currentPosition}.</Text>
           </View>
 
-          <Text style={styles.itemText}>{item.text}</Text>
+          <Text style={[styles.itemText, { color: dynamicColor }]}>{item.text}</Text>
 
-          {/* Drag handle hint - changed to three lines for better UX */}
-          <Ionicons name="reorder-three" size={24} color={isActive ? "#ff9d33" : "#555"} style={{ marginRight: 10 }} />
+          <Ionicons 
+            name="reorder-three" 
+            size={24} 
+            color={isActive ? themeColor : (lightMode ? "#999" : "#444")} 
+            style={{ marginRight: 10 }} 
+          />
 
           <Pressable 
               onPress={async () => {
-                try {
-                  // Standardized to 'ranking' (lowercase) to match your state listener
-                  await deleteDoc(doc(db, 'users', user!.uid, 'ranking', item.id));
-                } catch (e) {
-                  console.error("Error deleting document: ", e);
-                  Alert.alert("Error", "Could not delete this item.");
-                }
+                await deleteDoc(doc(db, 'users', user!.uid, 'ranking', item.id));
               }}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, padding: 5 })}
             >
@@ -144,82 +147,89 @@ export default function PrioritiesScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
-        <LinearGradient colors={['#000000', '#1a0f05', '#2a1a0a']} style={StyleSheet.absoluteFill} />
+        {/* Dynamic Deep Gradient - Swapped for Light Mode Top logic */}
+        <LinearGradient 
+          colors={
+            lightMode 
+              ? ['#FFFFFF', '#FFFFFF', themeColor] // Sunrise Top
+              : ['#000000', '#000000', themeColor] // Midnight Top
+          } 
+          locations={[0, 0.15, 1]} 
+          style={StyleSheet.absoluteFill} 
+        />
 
         <View style={styles.inputContainer}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { 
+              color: dynamicColor, 
+              backgroundColor: cardBg,
+              borderColor: cardBorder 
+            }]}
             placeholder="Add a new priority..."
-            placeholderTextColor="#888"
+            placeholderTextColor={lightMode ? "#999" : "#666"}
             value={newItemText}
             onChangeText={setNewItemText}
           />
-          <Pressable style={styles.addBtn} onPress={addItem}>
+          <Pressable style={[styles.addBtn, { backgroundColor: themeColor }]} onPress={addItem}>
             <Ionicons name="add" size={30} color="#fff" />
           </Pressable>
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#ff9d33" style={{ marginTop: 50 }} />
+          <ActivityIndicator color={themeColor} style={{ marginTop: 50 }} />
         ) : (
           <DraggableFlatList
-          data={items}
-          onDragEnd={({ data }) => handleDragEnd(data)}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          // Added this prop to help with layout calculations
-          containerStyle={{ flex: 1 }}
-        />)}
+            data={items}
+            onDragEnd={({ data }) => handleDragEnd(data)}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            containerStyle={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          />
+        )}
       </View>
     </GestureHandlerRootView>
   );
 }
->>>>>>> Stashed changes
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 60 },
-  title: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
-  header: { 
+  inputContainer: { 
     flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 20,
-    zIndex: 10, // Ensure it's above other elements
+    marginBottom: 25, 
+    marginTop: 10 
   },
-  inputContainer: { flexDirection: 'row', marginBottom: 20 },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    borderRadius: 15,
     padding: 15,
-    color: '#fff',
     marginRight: 10,
+    borderWidth: 1,
   },
   addBtn: {
-    backgroundColor: '#ff9d33',
-    width: 50,
-    borderRadius: 12,
+    width: 55,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 4,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 10,
+    padding: 18,
+    borderRadius: 20,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  itemText: { color: '#fff', fontSize: 16, flex: 1 },
+  itemText: { fontSize: 16, flex: 1, fontWeight: '500' },
   numberBadge: {
-    width: 30,
-    marginRight: 10,
+    width: 35,
+    marginRight: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   numberText: {
-    color: '#ff9d33',
     fontWeight: 'bold',
     fontSize: 18,
   },
