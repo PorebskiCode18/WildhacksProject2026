@@ -5,6 +5,7 @@ Welcome to Time Bean, an Ai powered calendar intended to help you maximize your 
 After cloning the repository, download Node.js, ngrok
 
 Run npm install in terminal
+
 After download completes, run npx expo start (or npx expo start --tunnel) if app doesnt load
 
 For mobile use, download Expo Go and scan QR code
