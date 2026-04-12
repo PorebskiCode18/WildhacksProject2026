@@ -7,8 +7,9 @@ import 'react-native-reanimated';
 export default function RootLayout() {
   return (
     <ThemeProvider value={DarkTheme}>
-      <Stack initialRouteName="sign-up">
+      <Stack initialRouteName="sign-in">
         {/* Auth Screens */}
+        
         <Stack.Screen 
           name="sign-up" 
           options={{ headerShown: false }} 

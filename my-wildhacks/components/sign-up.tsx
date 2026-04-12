@@ -9,7 +9,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView
+  SafeAreaView,
+  useColorScheme,
 } from 'react-native'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
@@ -18,11 +19,12 @@ import { auth, db } from '../firebaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
-
+import { ThemedView } from '../components/themed-view';
 export default function SignUp() {
   // Theme State
-  const [isDarkMode, setIsDarkMode] = useState(true)
-
+  
+const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
   // Form State
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -113,7 +115,7 @@ export default function SignUp() {
 
         <SafeAreaView style={{ flex: 1 }}>
           {/* Theme Toggle Button (Lowered via paddingTop) */}
-          <View style={styles.headerAction}>
+          {/* <View style={styles.headerAction}>
             <Pressable 
               onPress={() => setIsDarkMode(!isDarkMode)}
               style={[styles.iconCircle, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
@@ -124,7 +126,7 @@ export default function SignUp() {
                 color={theme.text} 
               />
             </Pressable>
-          </View>
+          </View> */}
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>

@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  useColorScheme,
 } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'expo-router';
@@ -19,8 +20,9 @@ import { StatusBar } from 'expo-status-bar';
 
 export default function SignIn() {
   // Theme State
-  const [isDarkMode, setIsDarkMode] = useState(true);
-
+  
+const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,7 +72,7 @@ export default function SignIn() {
 
         <SafeAreaView style={{ flex: 1 }}>
           {/* Theme Toggle Icon */}
-          <View style={styles.headerAction}>
+          {/* <View style={styles.headerAction}>
             <Pressable 
               onPress={() => setIsDarkMode(!isDarkMode)}
               style={[styles.iconCircle, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
@@ -81,7 +83,7 @@ export default function SignIn() {
                 color={theme.text} 
               />
             </Pressable>
-          </View>
+          </View> */}
 
           <View style={styles.content}>
             <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>

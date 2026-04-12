@@ -179,7 +179,7 @@ export default function FullCalendar() {
         dayComponent={({date, state}: any) => {
           const dayEvents = allEvents.filter(e => isEventOnDay(e, date.dateString)).slice(0, 3);
           return (
-            <Pressable style={[styles.dayBox, { borderColor: lightMode ? 'rgba(0,0,0,0.05)' : '#221a15' }, state==='today' && {borderColor: themeColor}]} onPress={()=>{setSelectedDate(date.dateString); openDrawer();}}>
+            <Pressable style={[styles.dayBox, { borderColor: lightMode ? 'rgba(0,0,0,0.05)' : '#221a15' ,backgroundColor: lightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.4)'}, state==='today' && {borderColor: themeColor}]} onPress={()=>{setSelectedDate(date.dateString); openDrawer();}}>
               <Text style={[styles.dayText, { color: dynamicColor }, state==='disabled' && {color: lightMode ? '#ccc' : '#444'}]}>{date.day}</Text>
               <View style={styles.miniEventContainer}>
                 {dayEvents.map((e, i) => <Text key={i} style={[styles.miniEventText, {color: e.color || themeColor}]} numberOfLines={1}>• {e.title}</Text>)}
@@ -280,7 +280,7 @@ export default function FullCalendar() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000', paddingTop: 50 },
-  dayBox: { width: SCREEN_WIDTH / 7 - 1, height: 75, borderWidth: 0.5, padding: 4 },
+  dayBox: { width: SCREEN_WIDTH / 7 - 5, height: 75, borderWidth: 0.5, padding: 4,borderRadius: 8 },
   dayText: { fontSize: 10, fontWeight: '700' },
   monthHeader: { fontSize: 22, fontWeight: '700', marginVertical: 10, textAlign: 'center' },
   miniEventContainer: { marginTop: 2 },
