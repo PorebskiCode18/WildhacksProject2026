@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 30,
-    marginTop: 10,
+    marginTop: 30,
   },
   greeting: { color: '#aaa', fontSize: 16 },
   username: { color: '#fff', fontSize: 24, fontWeight: '700' },

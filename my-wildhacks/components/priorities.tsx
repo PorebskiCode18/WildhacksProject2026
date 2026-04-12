@@ -7,7 +7,7 @@ interface Props {
 }
 
 // 2. Define the Component
-const priorities = ({ title = "Hello World" }: Props) => {
+const priorities = ({ title = "Priorities" }: Props) => {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>{title}</Text>

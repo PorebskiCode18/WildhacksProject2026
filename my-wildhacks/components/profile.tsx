@@ -7,7 +7,7 @@ interface Props {
 }
 
 // 2. Define the Component
-const profile = ({ title = "Hello World" }: Props) => {
+const profile = ({ title = "Profile" }: Props) => {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>{title}</Text>
