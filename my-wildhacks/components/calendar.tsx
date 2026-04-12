@@ -242,6 +242,10 @@ console.log("Sorted Priorities:", priorities);
     setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== suggestion.gapIndex));
   };
 
+  const rejectSuggestion = (gapIndex: number) => {
+    setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== gapIndex));
+  };
+
   const isEventOnDay = (event: any, dateString: string) => {
     const dStart = new Date(dateString + 'T00:00:00');
     const dEnd = new Date(dateString + 'T23:59:59');
@@ -368,25 +372,51 @@ console.log("Sorted Priorities:", priorities);
                   </Pressable>
                 );
               })}
+              {/* RENDER AI SUGGESTIONS */}
               {suggestedBlocks.map((sug) => {
-  const sM = sug.gapStart.getHours() * 60 + sug.gapStart.getMinutes();
-  const eM = sug.gapEnd.getHours() * 60 + sug.gapEnd.getMinutes();
-  const topPos = (sM / 60) * HOUR_HEIGHT;
-  const height = (Math.max(eM - sM, 30) / 60) * HOUR_HEIGHT;
-  
-  return (
-    // CHANGE THIS LINE:
-    <View key={sug.tempId} style={[styles.absoluteEvent, styles.suggestedEvent, { top: topPos, height: height, left: 60, width: SCREEN_WIDTH - 80 }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.eventTitleSmall, { color: '#8e44ad' }]} numberOfLines={1}>✨ {sug.suggestedPriorityTitle}</Text>
-        <Text style={[styles.eventTimeSmall, { color: '#8e44ad', fontStyle: 'italic' }]} numberOfLines={2}>{sug.reasoning}</Text>
-      </View>
-      <Pressable style={styles.acceptBtn} onPress={() => acceptSuggestion(sug)}>
-        <Ionicons name="checkmark" size={16} color="#fff" />
-      </Pressable>
-    </View>
-  );
-})}
+                const sM = sug.gapStart.getHours() * 60 + sug.gapStart.getMinutes();
+                const eM = sug.gapEnd.getHours() * 60 + sug.gapEnd.getMinutes();
+                const topPos = (sM / 60) * HOUR_HEIGHT;
+                const height = (Math.max(eM - sM, 30) / 60) * HOUR_HEIGHT;
+                
+                // If it's a short block, side-by-side buttons. If tall, stack them.
+                const buttonLayout = height > 50 ? 'column' : 'row';
+                
+                return (
+                  <View 
+                    key={`sug-${sug.gapIndex}`} 
+                    style={[
+                      styles.absoluteEvent, 
+                      styles.suggestedEvent, 
+                      { top: topPos, height: height, left: 60, width: SCREEN_WIDTH - 80, alignItems: 'flex-start', paddingTop: 4, paddingBottom: 4 }
+                    ]}
+                  >
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      {/* Increased numberOfLines to allow wrapping */}
+                      <Text style={[styles.eventTitleSmall, { color: '#8e44ad' }]} numberOfLines={height > 50 ? 2 : 1}>
+                        ✨ {sug.suggestedPriorityTitle}
+                      </Text>
+                      
+                      {/* Hide reasoning completely if the block is too short to fit it cleanly */}
+                      {height > 50 && (
+                        <Text style={[styles.eventTimeSmall, { color: '#8e44ad', fontStyle: 'italic', marginTop: 2 }]} numberOfLines={3}>
+                          {sug.reasoning}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Action Buttons Container */}
+                    <View style={{ flexDirection: buttonLayout, gap: 6, justifyContent: 'center', alignItems: 'center', alignSelf: 'center' }}>
+                      <Pressable style={styles.acceptBtn} onPress={() => acceptSuggestion(sug)}>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      </Pressable>
+                      <Pressable style={styles.rejectBtn} onPress={() => rejectSuggestion(sug.gapIndex)}>
+                        <Ionicons name="close" size={16} color="#fff" />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
         </Animated.View>
@@ -539,9 +569,18 @@ const styles = StyleSheet.create({
   catInput: { flex: 1, fontSize: 13, fontWeight: '600' },
   aiButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
   aiButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 12, marginLeft: 4 },
-  suggestedEvent: { backgroundColor: 'rgba(142, 68, 173, 0.1)', borderLeftWidth: 0, borderWidth: 1, borderColor: '#8e44ad', borderStyle: 'dashed', flexDirection: 'row', alignItems: 'center', paddingRight: 5 },
-  acceptBtn: { backgroundColor: '#8e44ad', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginLeft: 5 },
-
+  suggestedEvent: { 
+    backgroundColor: 'rgba(142, 68, 173, 0.1)', 
+    borderLeftWidth: 0, 
+    borderWidth: 1, 
+    borderColor: '#8e44ad', 
+    borderStyle: 'dashed', 
+    flexDirection: 'row', 
+    paddingRight: 6 
+  },
+  acceptBtn: { backgroundColor: '#8e44ad', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  rejectBtn: { backgroundColor: '#e74c3c', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  
   // Location Modal Styles
   mapModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
   mapModalContent: { height: '80%', backgroundColor: '#1a0f05', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 },
