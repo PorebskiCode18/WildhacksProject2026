@@ -23,9 +23,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const APP_THEMES = [
   { name: 'Sandstone', color: '#8e7d71' },
   { name: 'Slate', color: '#71828e' },
-  { name: 'Sage', color: '#7d8e71' },
+  { name: 'Sage', color: '#5e3205' },
   { name: 'Mauve', color: '#8e7182' },
-  { name: 'Steel', color: '#718e8e' },
+  { name: 'Steel', color: '#333333' },
   { name: 'Amber', color: '#d4a373' }, 
   { name: 'Sky', color: '#7fb3d5' },   
   { name: 'Mint', color: '#82c4a2' },  
