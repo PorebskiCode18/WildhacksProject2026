@@ -21,6 +21,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+// ScheduleAgent Imports
+import { ActivityIndicator, Alert } from 'react-native'; // Add ActivityIndicator and Alert
+import { getDocs } from 'firebase/firestore'; // Add getDocs
+import { generateScheduleSuggestions, PriorityItem, CalendarEvent } from '../services/ScheduleAgent'; // Import the agent
+
 // Map Imports
 import MapView, { Marker } from 'react-native-maps';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
@@ -43,6 +48,10 @@ export default function FullCalendar() {
   const [allEvents, setAllEvents] = useState<any[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // ScheduleAgent States
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestedBlocks, setSuggestedBlocks] = useState<any[]>([]);
   
   // Customization & Global States
   const [themeColor, setThemeColor] = useState('#ff8c00');
@@ -163,6 +172,72 @@ export default function FullCalendar() {
     setShowAddModal(false); 
   };
 
+  const handleSuggestSchedule = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    setIsSuggesting(true);
+    setSuggestedBlocks([]); // Clear old suggestions
+
+    try {
+      // 1. Fetch the user's priorities
+      const pSnap = await getDocs(query(collection(db, 'users', user.uid, 'priorities'), orderBy('rank', 'asc')));
+      const priorities: PriorityItem[] = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as PriorityItem));
+
+      if (priorities.length === 0) {
+        Alert.alert("No Priorities", "Please add some items to your Priorities list first!");
+        setIsSuggesting(false);
+        return;
+      }
+
+      // 2. Format today's events for the AI
+      const targetDateObj = new Date(selectedDate + 'T00:00:00');
+      const targetEvents: CalendarEvent[] = allEvents
+        .filter(e => isEventOnDay(e, selectedDate))
+        .map(e => ({
+          id: e.id,
+          title: e.title,
+          start: e.start.toDate(),
+          end: e.end.toDate(),
+          location: e.location || null
+        }));
+
+      // 3. Call the Agent
+      const suggestions = await generateScheduleSuggestions(targetDateObj, targetEvents, priorities);
+
+      if (suggestions && Array.isArray(suggestions)) {
+        setSuggestedBlocks(suggestions);
+      } else if (suggestions?.message) {
+        Alert.alert("Schedule Full", suggestions.message);
+      } else {
+        Alert.alert("Error", "Could not generate a schedule at this time.");
+      }
+    } catch (error) {
+      console.error("Agent Error:", error);
+      Alert.alert("Error", "Something went wrong communicating with the AI.");
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const acceptSuggestion = async (suggestion: any) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    // Save to Firestore
+    const eventData = { 
+      title: suggestion.suggestedPriorityTitle, 
+      location: null, // You can look this up from priorities if needed
+      start: Timestamp.fromDate(suggestion.gapStart), 
+      end: Timestamp.fromDate(suggestion.gapEnd), 
+      color: '#00d4ff' // Default AI color, e.g., 'Social' or 'Health'
+    };
+    await addDoc(collection(db, 'users', user.uid, 'events'), eventData);
+    
+    // Remove from suggestions array
+    setSuggestedBlocks(prev => prev.filter(s => s.gapIndex !== suggestion.gapIndex));
+  };
+
   const isEventOnDay = (event: any, dateString: string) => {
     const dStart = new Date(dateString + 'T00:00:00');
     const dEnd = new Date(dateString + 'T23:59:59');
@@ -240,8 +315,22 @@ export default function FullCalendar() {
         <Animated.View style={[styles.drawerContent, { backgroundColor: lightMode ? '#f5f5f5' : '#161616', transform: [{ translateY }] }]} {...panResponder.panHandlers}>
           <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.timelineHeader}>
-            <View><Text style={[styles.dateLabel, { color: dynamicColor }]}>{selectedDate}</Text><Text style={[styles.dateSubLabel, { color: themeColor }]}>Schedule</Text></View>
-            <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(null); setShowAddModal(true); }}><Ionicons name="add-circle" size={40} color={themeColor} /></Pressable>
+            <View>
+              <Text style={[styles.dateLabel, { color: dynamicColor }]}>{selectedDate}</Text>
+              <Text style={[styles.dateSubLabel, { color: themeColor }]}>Schedule</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+              <Pressable 
+                onPress={handleSuggestSchedule} 
+                style={[styles.aiButton, { backgroundColor: isSuggesting ? '#555' : '#8e44ad' }]} 
+                disabled={isSuggesting}
+              >
+                {isSuggesting ? <ActivityIndicator color="#fff" size="small" /> : <><Ionicons name="sparkles" size={16} color="#fff" /><Text style={styles.aiButtonText}> Auto-Fill</Text></>}
+              </Pressable>
+              <Pressable onPress={() => { setEditingEventId(null); setEventTitle(''); setEventLocation(null); setShowAddModal(true); }}>
+                <Ionicons name="add-circle" size={40} color={themeColor} />
+              </Pressable>
+            </View>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 20, paddingBottom:50 }}>
             <View style={{ height: HOUR_HEIGHT * 24 }}>
@@ -273,6 +362,24 @@ export default function FullCalendar() {
   {eS < dS ? "Cont." : formatTime(eS)} - {eE > dE ? "Cont." : formatTime(eE)}
 </Text>
                   </Pressable>
+                );
+              })}
+              {suggestedBlocks.map((sug) => {
+                const sM = sug.gapStart.getHours() * 60 + sug.gapStart.getMinutes();
+                const eM = sug.gapEnd.getHours() * 60 + sug.gapEnd.getMinutes();
+                const topPos = (sM / 60) * HOUR_HEIGHT;
+                const height = (Math.max(eM - sM, 30) / 60) * HOUR_HEIGHT;
+                
+                return (
+                  <View key={`sug-${sug.gapIndex}`} style={[styles.absoluteEvent, styles.suggestedEvent, { top: topPos, height: height, left: 60, width: SCREEN_WIDTH - 80 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.eventTitleSmall, { color: '#8e44ad' }]} numberOfLines={1}>✨ {sug.suggestedPriorityTitle}</Text>
+                      <Text style={[styles.eventTimeSmall, { color: '#8e44ad', fontStyle: 'italic' }]} numberOfLines={2}>{sug.reasoning}</Text>
+                    </View>
+                    <Pressable style={styles.acceptBtn} onPress={() => acceptSuggestion(sug)}>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    </Pressable>
+                  </View>
                 );
               })}
             </View>
@@ -425,7 +532,11 @@ const styles = StyleSheet.create({
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 8, borderRadius: 10 },
   circleSmall: { width: 24, height: 24, borderRadius: 12, marginRight: 12 },
   catInput: { flex: 1, fontSize: 13, fontWeight: '600' },
-  
+  aiButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  aiButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 12, marginLeft: 4 },
+  suggestedEvent: { backgroundColor: 'rgba(142, 68, 173, 0.1)', borderLeftWidth: 0, borderWidth: 1, borderColor: '#8e44ad', borderStyle: 'dashed', flexDirection: 'row', alignItems: 'center', paddingRight: 5 },
+  acceptBtn: { backgroundColor: '#8e44ad', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginLeft: 5 },
+
   // Location Modal Styles
   mapModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
   mapModalContent: { height: '80%', backgroundColor: '#1a0f05', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 },

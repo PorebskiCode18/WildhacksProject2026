@@ -156,7 +156,7 @@ export default function Home() {
                       </Text>
                       {event.location ? (
                         <Text style={[styles.todayEventLoc, { color: lightMode ? '#888' : '#777' }]} numberOfLines={1}>
-                          <Ionicons name="location" size={16} /> {event.location}
+                          <Ionicons name="location" size={16} /> {event.location.address}
                         </Text>
                       ) : null}
                     </View>
