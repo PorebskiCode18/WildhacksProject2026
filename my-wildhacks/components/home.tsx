@@ -5,14 +5,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig'; // Adjust path to your config
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'expo-router';
 
 
 const QUICK_ACTIONS = [
-  { id: '1', icon: 'calendar', label: 'Calendar', screen: 'Calendar' },
-  { id: '2', icon: 'list', label: 'Priorities', screen: 'Priorities' },
+  { id: '1', icon: 'calendar', label: 'Calendar', path: '/calendar' },
+  { id: '2', icon: 'list', label: 'Priorities', path: '/priorities' }, // This matches priorities.tsx
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [userData, setUserData] = useState({ firstName: 'User', username: '' });
 
   useEffect(() => {
@@ -79,7 +81,8 @@ export default function Home() {
                 key={action.id} 
                 icon={action.icon} 
                 label={action.label} 
-                onPress={() => console.log(`Navigating to ${action.screen}`)}
+                // Specifically using the path defined in your QUICK_ACTIONS array
+                onPress={() => router.replace(action.path as any)} 
               />
             ))}
           </View>

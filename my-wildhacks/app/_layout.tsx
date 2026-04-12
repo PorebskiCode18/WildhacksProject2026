@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler'; // MUST BE LINE 1
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, DarkTheme } from '@react-navigation/native';
