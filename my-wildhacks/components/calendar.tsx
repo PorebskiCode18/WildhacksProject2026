@@ -182,12 +182,8 @@ export default function FullCalendar() {
 
     try {
       // 1. Fetch the user's priorities
-<<<<<<< Updated upstream
-      const pSnap = await getDocs(query(collection(db, 'users', user.uid, 'ranking'), orderBy('rank', 'asc')));
-=======
+
       const pSnap = await getDocs(query(collection(db, 'users', user.uid, 'ranking'), orderBy('index', 'asc')));
-      
->>>>>>> Stashed changes
       const priorities: PriorityItem[] = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as PriorityItem));
 
 
@@ -373,23 +369,24 @@ console.log("Sorted Priorities:", priorities);
                 );
               })}
               {suggestedBlocks.map((sug) => {
-                const sM = sug.gapStart.getHours() * 60 + sug.gapStart.getMinutes();
-                const eM = sug.gapEnd.getHours() * 60 + sug.gapEnd.getMinutes();
-                const topPos = (sM / 60) * HOUR_HEIGHT;
-                const height = (Math.max(eM - sM, 30) / 60) * HOUR_HEIGHT;
-                
-                return (
-                  <View key={`sug-${sug.gapIndex}`} style={[styles.absoluteEvent, styles.suggestedEvent, { top: topPos, height: height, left: 60, width: SCREEN_WIDTH - 80 }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.eventTitleSmall, { color: '#8e44ad' }]} numberOfLines={1}>✨ {sug.suggestedPriorityTitle}</Text>
-                      <Text style={[styles.eventTimeSmall, { color: '#8e44ad', fontStyle: 'italic' }]} numberOfLines={2}>{sug.reasoning}</Text>
-                    </View>
-                    <Pressable style={styles.acceptBtn} onPress={() => acceptSuggestion(sug)}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    </Pressable>
-                  </View>
-                );
-              })}
+  const sM = sug.gapStart.getHours() * 60 + sug.gapStart.getMinutes();
+  const eM = sug.gapEnd.getHours() * 60 + sug.gapEnd.getMinutes();
+  const topPos = (sM / 60) * HOUR_HEIGHT;
+  const height = (Math.max(eM - sM, 30) / 60) * HOUR_HEIGHT;
+  
+  return (
+    // CHANGE THIS LINE:
+    <View key={sug.tempId} style={[styles.absoluteEvent, styles.suggestedEvent, { top: topPos, height: height, left: 60, width: SCREEN_WIDTH - 80 }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.eventTitleSmall, { color: '#8e44ad' }]} numberOfLines={1}>✨ {sug.suggestedPriorityTitle}</Text>
+        <Text style={[styles.eventTimeSmall, { color: '#8e44ad', fontStyle: 'italic' }]} numberOfLines={2}>{sug.reasoning}</Text>
+      </View>
+      <Pressable style={styles.acceptBtn} onPress={() => acceptSuggestion(sug)}>
+        <Ionicons name="checkmark" size={16} color="#fff" />
+      </Pressable>
+    </View>
+  );
+})}
             </View>
           </ScrollView>
         </Animated.View>

@@ -52,15 +52,13 @@ export const generateScheduleSuggestions = async (
     return { message: "Your day is completely full!" };
   }
 
-  // --- Step 2: Distance Matrix Math ---
+  // --- Step 2: Format Data for AI ---
   console.log("Step 2: Analyzing locations...");
-  // Instead of querying the API for every possible permutation (which would be extremely costly),
-  // we pass the coordinates to Gemini and instruct it to use rough geographical heuristic logic 
-  // based on the addresses, while warning it of the constraints.
   const formattedGaps = timeGaps.map((gap, index) => ({
     index,
-    start: gap.start.toLocaleTimeString(),
-    end: gap.end.toLocaleTimeString(),
+    // Using ISO strings ensures the AI understands the exact date and time context
+    gapStartISO: gap.start.toISOString(),
+    gapEndISO: gap.end.toISOString(),
     durationMinutes: gap.durationMinutes,
     comingFrom: gap.previousLocation?.address || "Unknown/Home",
     goingTo: gap.nextLocation?.address || "Unknown/Home"
@@ -79,10 +77,8 @@ export const generateScheduleSuggestions = async (
   const historySnap = await getDocs(historyQuery);
   const activityCounts: Record<string, number> = {};
   
-  // Initialize counts
   priorities.forEach(p => activityCounts[p.title] = 0);
   
-  // Tally occurrences
   historySnap.forEach(doc => {
     const data = doc.data();
     if (activityCounts[data.title] !== undefined) {
@@ -90,63 +86,60 @@ export const generateScheduleSuggestions = async (
     }
   });
 
-  // --- Step 4: The AI Prompt ---
+  // --- Step 4: Updated AI Prompt with Timing Logic ---
   console.log("Step 4: Prompting Gemini...");
   const prompt = `
-    You are an intelligent scheduling AI designed to prevent users from wasting their free time.
-    Your goal is to fill the user's free time gaps with activities from their Priorities list.
+    You are an intelligent scheduling AI. Your goal is to fill free time gaps with activities from the Priorities list.
     
-    Here is the data for today (${targetDate.toDateString()}):
+    Today's Date: ${targetDate.toDateString()}
     
     1. FREE TIME GAPS:
     ${JSON.stringify(formattedGaps, null, 2)}
     
-    2. USER PRIORITIES (Ranked by importance, 1 being highest):
-    ${JSON.stringify(priorities.map(p => ({ title: p.title, rank: p.rank, location: p.location.address })), null, 2)}
+    2. USER PRIORITIES:
+    ${JSON.stringify(priorities.map(p => ({ id: p.id, title: p.title, rank: p.rank, location: p.location.address })), null, 2)}
     
-    3. RECENT ACTIVITY HISTORY (Times each priority was done in the last 7 days):
+    3. RECENT HISTORY:
     ${JSON.stringify(activityCounts, null, 2)}
     
     CRITICAL INSTRUCTIONS:
-    - base suggestions primarily off of the name of the priority, not the location, but use the location for travel logic.
-    - You must assign at least ONE priority to each free time gap.
-    - Ensure the priority makes sense for the 'durationMinutes' of the gap.
-    - Consider travel logistics: look at 'comingFrom' and 'goingTo'. Do not suggest a priority location that is wildly impractical to travel to between those two points.
-    - BALANCE: While rank is important, variety is vital. If a high-rank priority has a high history count, you MUST suggest lower-ranked priorities that the user enjoys but hasn't done recently to prevent burnout.
-    - Given a large gap in time, defer to multiple priorities over a single one to maximize variety and engagement.
-    - Approximate the length of the event based on the activity in the name of the priority (e.g., "Go for a run" might be 30-60 mins, "Read a book" might be 60+ mins, "Meditate" might be 10-20 mins). Use this to determine how many priorities can fit in each gap.
-    - Leave appropriate gaps between activities for travel and rest, both scheduled and suggested
+    - You MUST assign a specific "startTime" and "endTime" for each suggestion.
+    - These times MUST fall strictly within the boundaries of the gap provided (gapStartISO to gapEndISO).
+    - NO OVERLAPS: If you suggest multiple activities for one gap, ensure the second activity starts after the first one ends.
+    - TRAVEL BUFFER: Leave at least 10-15 minutes between activities for transition/travel.
+    - DURATION: Base the length of the suggestion on the activity type (e.g., "Gym" = 60m, "Meditate" = 15m).
+    - Use ISO 8601 format for startTime and endTime.
 
-    
     OUTPUT FORMAT:
-    You must return a raw JSON array containing objects for each gap. Do not include markdown blocks (like \`\`\`json). Just the raw JSON.
-    Format:
+    Return a raw JSON array. Just the raw JSON, no markdown.
     [
       {
         "gapIndex": 0,
-        "suggestedPriorityId": "the_id_of_the_priority",
+        "suggestedPriorityId": "id",
         "suggestedPriorityTitle": "Title",
-        "reasoning": "A 1-sentence explanation mentioning rank, travel logic, or history."
+        "startTime": "2026-04-12T14:00:00.000Z",
+        "endTime": "2026-04-12T14:45:00.000Z",
+        "reasoning": "A short explanation."
       }
     ]
   `;
 
-  // --- Step 5: Parse and Return JSON ---
+  // --- Step 5: Parse and Map Response ---
   console.log("Step 5: Parsing Response...");
   try {
     const result = await model.generateContent(prompt);
     let responseText = result.response.text();
     
-    // Clean up any markdown formatting Gemini might accidentally include
     responseText = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
     
     const suggestedSchedule = JSON.parse(responseText);
     
-    // Map the AI suggestions back to the raw Date objects from our gaps array
-    return suggestedSchedule.map((suggestion: any) => ({
+    return suggestedSchedule.map((suggestion: any, index: number) => ({
       ...suggestion,
-      gapStart: timeGaps[suggestion.gapIndex].start,
-      gapEnd: timeGaps[suggestion.gapIndex].end,
+      tempId: `sug-${suggestion.gapIndex}-${index}`,
+      // We overwrite the gap boundaries with the AI's specific calculated times
+      gapStart: new Date(suggestion.startTime), 
+      gapEnd: new Date(suggestion.endTime),
     }));
     
   } catch (error) {
@@ -157,19 +150,13 @@ export const generateScheduleSuggestions = async (
 
 // --- HELPER FUNCTIONS ---
 
-/**
- * Calculates free time gaps in a day, automatically merging overlapping events.
- * Assumes a waking day from 8:00 AM to 10:00 PM (can be adjusted).
- */
 function calculateTimeGaps(events: CalendarEvent[], targetDate: Date): TimeGap[] {
-  // 1. Define the bounds of the day (e.g., 8:00 AM to 10:00 PM)
   const dayStart = new Date(targetDate);
   dayStart.setHours(8, 0, 0, 0);
   
   const dayEnd = new Date(targetDate);
   dayEnd.setHours(22, 0, 0, 0);
 
-  // Filter events to only include those that fall within our day bounds
   const dayEvents = events.filter(e => e.end > dayStart && e.start < dayEnd);
 
   if (dayEvents.length === 0) {
@@ -182,22 +169,15 @@ function calculateTimeGaps(events: CalendarEvent[], targetDate: Date): TimeGap[]
     }];
   }
 
-  // 2. Sort events chronologically by start time
   dayEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-  // 3. Merge overlapping events
   const mergedEvents: CalendarEvent[] = [dayEvents[0]];
-  
   for (let i = 1; i < dayEvents.length; i++) {
     const currentEvent = dayEvents[i];
     const lastMergedEvent = mergedEvents[mergedEvents.length - 1];
-
-    // If the current event starts before or exactly when the last one ends, they overlap
     if (currentEvent.start <= lastMergedEvent.end) {
-      // Extend the end time if the current event ends later
       if (currentEvent.end > lastMergedEvent.end) {
         lastMergedEvent.end = currentEvent.end;
-        // Keep the location of whichever event ends later (as the departure point)
         lastMergedEvent.location = currentEvent.location; 
       }
     } else {
@@ -205,7 +185,6 @@ function calculateTimeGaps(events: CalendarEvent[], targetDate: Date): TimeGap[]
     }
   }
 
-  // 4. Extract the gaps between merged events
   const gaps: TimeGap[] = [];
   let currentTime = dayStart;
   let previousLoc: LocationData | null = null;
@@ -213,7 +192,6 @@ function calculateTimeGaps(events: CalendarEvent[], targetDate: Date): TimeGap[]
   for (const event of mergedEvents) {
     if (event.start > currentTime) {
       const duration = Math.round((event.start.getTime() - currentTime.getTime()) / 60000);
-      // Only consider gaps larger than 30 minutes
       if (duration >= 30) {
         gaps.push({
           start: new Date(currentTime),
@@ -228,7 +206,6 @@ function calculateTimeGaps(events: CalendarEvent[], targetDate: Date): TimeGap[]
     previousLoc = event.location;
   }
 
-  // 5. Add the final gap from the last event to the end of the day
   if (currentTime < dayEnd) {
     const duration = Math.round((dayEnd.getTime() - currentTime.getTime()) / 60000);
     if (duration >= 30) {
